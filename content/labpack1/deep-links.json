@@ -1,0 +1,336 @@
+{
+  "version": "1.0",
+  "description": "Deep links for Lab Pack #1: From Boys Functions to SCF Convergence",
+  "generated": "2026-01-18",
+  "base_url": "https://iqcp.dev",
+  "local_url": "http://localhost:5173",
+  "sections": {
+    "boys": {
+      "description": "Boys Function Exploration deep links",
+      "links": [
+        {
+          "id": "boys-2.1",
+          "label": "Default Boys view",
+          "description": "F_0(T=1.0) with explain mode - starting point for exploration",
+          "url": "https://iqcp.dev/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIg1YosMAO79seAOYKQAX1aksOyTMXEYAD3ZyCFgETk5AA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "boys",
+            "boys": { "m": 0, "T": 1.0, "view": "single" },
+            "ui": { "mode": "explain" }
+          }
+        },
+        {
+          "id": "boys-2.2a",
+          "label": "Small T (series regime)",
+          "description": "F_0(T=0.5) showing series regime behavior with internals",
+          "url": "https://iqcp.dev/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVfUICsrFFhgB3ftjwBzBSAC+rUlh2SZi4ljx06HgIchouLkA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "boys",
+            "boys": { "m": 0, "T": 0.5, "view": "single" },
+            "ui": { "mode": "internals" }
+          }
+        },
+        {
+          "id": "boys-2.2b",
+          "label": "Very small T",
+          "description": "F_0(T=0.01) approaching the limiting value 1/(2m+1)",
+          "url": "https://iqcp.dev/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVfWIasUWGAHd+2PAHMFIAL6tSWHZJmLiWPHXQ8BDkNZ2cgA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "boys",
+            "boys": { "m": 0, "T": 0.01, "view": "single" },
+            "ui": { "mode": "internals" }
+          }
+        },
+        {
+          "id": "boys-2.3a",
+          "label": "Moderate T (recurrence regime)",
+          "description": "F_0(T=15.0) showing recurrence regime behavior",
+          "url": "https://iqcp.dev/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIgwCsrFFhgB3ftjwBzBSAC+rUlh2SZi4ljx06HgIchouLkA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "boys",
+            "boys": { "m": 0, "T": 15.0, "view": "single" },
+            "ui": { "mode": "internals" }
+          }
+        },
+        {
+          "id": "boys-2.3b",
+          "label": "Large T (asymptotic regime)",
+          "description": "F_0(T=35.0) showing asymptotic behavior",
+          "url": "https://iqcp.dev/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIgGYArKxRYYAd37Y8AcwUgAvq1JYdkmYuJY8OnQ8BDkNV1cgA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "boys",
+            "boys": { "m": 0, "T": 35.0, "view": "single" },
+            "ui": { "mode": "internals" }
+          }
+        },
+        {
+          "id": "boys-2.4a",
+          "label": "Higher order m",
+          "description": "F_5(T=10.0) comparing higher order behavior",
+          "url": "https://iqcp.dev/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgFZWAFSIMBrFFhgB3ftjwBzBSAC+rUlh2SZi4ljx06HgIchouLkA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "boys",
+            "boys": { "m": 5, "T": 10.0, "view": "single" },
+            "ui": { "mode": "internals" }
+          }
+        },
+        {
+          "id": "boys-2.4b",
+          "label": "Regime boundary",
+          "description": "F_0(T=12.0) near series/recurrence transition",
+          "url": "https://iqcp.dev/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIgwBMrFFhgB3ftjwBzBSAC+rUlh2SZi4ljx06HgIchouLkA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "boys",
+            "boys": { "m": 0, "T": 12.0, "view": "single" },
+            "ui": { "mode": "internals" }
+          }
+        },
+        {
+          "id": "boys-checkpoint",
+          "label": "Checkpoint artifact state",
+          "description": "F_3(T=8.0) for artifact export checkpoint",
+          "url": "https://iqcp.dev/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgGZWAFSIAOViiwwA7v2x4A5gpABfVqSw7JMxcSx46dDwEOQ0XFyA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "boys",
+            "boys": { "m": 3, "T": 8.0, "view": "single" },
+            "ui": { "mode": "internals" }
+          }
+        }
+      ]
+    },
+    "rys": {
+      "description": "Rys Quadrature Exploration deep links",
+      "links": [
+        {
+          "id": "rys-3.1",
+          "label": "Default Rys view",
+          "description": "n=3 quadrature at T=5.0 - starting point",
+          "url": "https://iqcp.dev/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEAzKwAqRAKysa6AOYwq-BjAC0ANhABfVqSxFQU6YuIwAD3Y5BCwCFxcgA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "rys",
+            "rys": { "n": 3, "T": 5.0, "target": "1e-6" },
+            "ui": { "mode": "explain" }
+          }
+        },
+        {
+          "id": "rys-3.2a",
+          "label": "Inspect roots and weights",
+          "description": "n=5 at T=10.0 - examine quadrature points",
+          "url": "https://iqcp.dev/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcSx4dOh4CHJqLi5AA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "rys",
+            "rys": { "n": 5, "T": 10.0, "target": "1e-6" },
+            "ui": { "mode": "internals" }
+          }
+        },
+        {
+          "id": "rys-3.2b",
+          "label": "High quadrature order",
+          "description": "n=10 at T=10.0 - compare with lower orders",
+          "url": "https://iqcp.dev/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEGA1gBUie1jXQBzGFX4MYAWgBsIAL6tSWIqCnTFxLHjp0PAQ5NWdnIA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "rys",
+            "rys": { "n": 10, "T": 10.0, "target": "1e-6" },
+            "ui": { "mode": "internals" }
+          }
+        },
+        {
+          "id": "rys-3.3a",
+          "label": "Error curve at moderate T",
+          "description": "n=5 at T=10.0 - examine error vs order relationship",
+          "url": "https://iqcp.dev/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "rys",
+            "rys": { "n": 5, "T": 10.0, "target": "1e-6" },
+            "ui": { "mode": "explain" }
+          }
+        },
+        {
+          "id": "rys-3.3b",
+          "label": "Error curve at larger T",
+          "description": "n=5 at T=25.0 - observe T dependence",
+          "url": "https://iqcp.dev/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRAEz6QNdAHMYVfgxgBaAGwgAvq1JYioKdMXEYAA92OQQsAldXIA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "rys",
+            "rys": { "n": 5, "T": 25.0, "target": "1e-6" },
+            "ui": { "mode": "explain" }
+          }
+        },
+        {
+          "id": "rys-3.4a",
+          "label": "Target 1e-6 accuracy",
+          "description": "Finding order needed for moderate accuracy",
+          "url": "https://iqcp.dev/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "rys",
+            "rys": { "n": 5, "T": 10.0, "target": "1e-6" },
+            "ui": { "mode": "explain" }
+          }
+        },
+        {
+          "id": "rys-3.4b",
+          "label": "Target 1e-8 accuracy",
+          "description": "Finding order needed for high accuracy",
+          "url": "https://iqcp.dev/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBgNY10AcxhV+DGAFoAHCAC+rUliKgp0xcRgAHuxyCFgELi5AA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "rys",
+            "rys": { "n": 5, "T": 10.0, "target": "1e-8" },
+            "ui": { "mode": "explain" }
+          }
+        },
+        {
+          "id": "rys-checkpoint",
+          "label": "Checkpoint artifact state",
+          "description": "T=15.0 with 1e-8 target for artifact export",
+          "url": "https://iqcp.dev/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBvpA10AcxhV+DGAFoAHCAC+rUliKgp0xcSx4dOh4CHJqLi5AA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "rys",
+            "rys": { "n": 5, "T": 15.0, "target": "1e-8" },
+            "ui": { "mode": "internals" }
+          }
+        }
+      ]
+    },
+    "scf": {
+      "description": "SCF Convergence Exploration deep links",
+      "links": [
+        {
+          "id": "scf-4.1",
+          "label": "H2 default run",
+          "description": "H2 molecule with medium convergence and DIIS",
+          "url": "https://iqcp.dev/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJkpUcAZgDmSdKIAsExAA99ddEQCsA1hHwp+OBhpLFI4CRCsMCIqMhgAX1ZSLA1JGUViGGd2OQQsAnj4oA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "scf",
+            "scf": { "system_id": "h2_sto3g_r1.4", "max_iter": 50, "conv": "medium", "diis": true },
+            "ui": { "mode": "explain" }
+          }
+        },
+        {
+          "id": "scf-4.2a",
+          "label": "H2 tight convergence (no DIIS)",
+          "description": "H2 with tight tolerance, DIIS disabled - observe slow convergence",
+          "url": "https://iqcp.dev/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJkpUcAZgDmSdKIAsExAA99ddEQCsA1hHwp+KiwrKCoJaSwsMCJlBDkwGABfVlIsDUkZRWIYZ3Y5BCwCRMSgA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "scf",
+            "scf": { "system_id": "h2_sto3g_r1.4", "max_iter": 50, "conv": "tight", "diis": false },
+            "ui": { "mode": "explain" }
+          }
+        },
+        {
+          "id": "scf-4.2b",
+          "label": "H2 tight convergence (with DIIS)",
+          "description": "H2 with tight tolerance, DIIS enabled - observe acceleration",
+          "url": "https://iqcp.dev/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJkpUcAZgDmSdKIAsExAA99ddEQCsA1hHwp+KiwrKCoJaSwsMCIqMhgAX1ZSLA1JGUViGGd2OQQsAnj4oA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "scf",
+            "scf": { "system_id": "h2_sto3g_r1.4", "max_iter": 50, "conv": "tight", "diis": true },
+            "ui": { "mode": "explain" }
+          }
+        },
+        {
+          "id": "scf-4.3a",
+          "label": "H2O without DIIS",
+          "description": "Water molecule with medium convergence, DIIS disabled",
+          "url": "https://iqcp.dev/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJhyUqOAMwBzCYgAe+uuiIBWAawj4U-ODGlYpHASAVhgRMoIcmAwAL6spFgakjKKxDD27HIIWASxsUA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "scf",
+            "scf": { "system_id": "h2o_sto3g", "max_iter": 50, "conv": "medium", "diis": false },
+            "ui": { "mode": "explain" }
+          }
+        },
+        {
+          "id": "scf-4.3b",
+          "label": "H2O with DIIS",
+          "description": "Water molecule with medium convergence, DIIS enabled",
+          "url": "https://iqcp.dev/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJhyUqOAMwBzCYgAe+uuiIBWAawj4U-ODGlYpHASAVhgRFRkMAC+rKRYGpIyisQw9uxyCFgE0dFAA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "scf",
+            "scf": { "system_id": "h2o_sto3g", "max_iter": 50, "conv": "medium", "diis": true },
+            "ui": { "mode": "explain" }
+          }
+        },
+        {
+          "id": "scf-4.4",
+          "label": "H2 matrix inspection",
+          "description": "H2 with internals mode - view Fock, density matrices",
+          "url": "https://iqcp.dev/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJkpUcAZgDmSdKIAsExAA99ddEQCsA1hHwp+OBhpLFI4CRCsMCIqMhgAX1ZSLA1JGUViLDx3PAQ5aPj4oA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "scf",
+            "scf": { "system_id": "h2_sto3g_r1.4", "max_iter": 50, "conv": "medium", "diis": true },
+            "ui": { "mode": "internals" }
+          }
+        },
+        {
+          "id": "scf-4.5",
+          "label": "LiH system",
+          "description": "Lithium hydride - more complex system with DIIS",
+          "url": "https://iqcp.dev/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn85WKJSo4AzAHMJiAB7666IgFYBrCPhT8qWK1CoJaSwsMCIqMhgAX1ZSLA1JGUViGDt2OQQsAiiooA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "scf",
+            "scf": { "system_id": "lih_sto3g", "max_iter": 50, "conv": "tight", "diis": true },
+            "ui": { "mode": "explain" }
+          }
+        },
+        {
+          "id": "scf-checkpoint",
+          "label": "Checkpoint artifact state",
+          "description": "H2O with DIIS for artifact export",
+          "url": "https://iqcp.dev/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJhyUqOAMwBzCYgAe+uuiIBWAawj4U-ODGlYpHASAVhgRFRkMAC+rKRYGpIyisRYeM54CHLh0dFAA",
+          "state": {
+            "schema_version": "run_state_v1",
+            "app_version": "0.1.0",
+            "module": "scf",
+            "scf": { "system_id": "h2o_sto3g", "max_iter": 50, "conv": "medium", "diis": true },
+            "ui": { "mode": "internals" }
+          }
+        }
+      ]
+    }
+  }
+}

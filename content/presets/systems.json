@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "description": "IQCP curated SCF systems for Module E",
+  "systems": [
+    {
+      "id": "h2_sto3g_r1.4",
+      "name": "H2",
+      "description": "Hydrogen molecule at equilibrium (R=1.4 bohr)",
+      "basis": "STO-3G",
+      "electrons": 2,
+      "atoms": 2,
+      "data_file": "systems/h2_sto3g_r1.4.json"
+    },
+    {
+      "id": "heh_plus_sto3g",
+      "name": "HeH+",
+      "description": "Helium hydride ion - heteronuclear diatomic",
+      "basis": "STO-3G",
+      "electrons": 2,
+      "atoms": 2,
+      "data_file": "systems/heh_plus_sto3g.json"
+    },
+    {
+      "id": "lih_sto3g",
+      "name": "LiH",
+      "description": "Lithium hydride - polar diatomic with core orbital",
+      "basis": "STO-3G",
+      "electrons": 4,
+      "atoms": 2,
+      "data_file": "systems/lih_sto3g.json"
+    },
+    {
+      "id": "h2o_sto3g",
+      "name": "H2O",
+      "description": "Water - bent triatomic with lone pairs",
+      "basis": "STO-3G",
+      "electrons": 10,
+      "atoms": 3,
+      "data_file": "systems/h2o_sto3g.json"
+    },
+    {
+      "id": "nh3_sto3g",
+      "name": "NH3",
+      "description": "Ammonia - pyramidal molecule",
+      "basis": "STO-3G",
+      "electrons": 10,
+      "atoms": 4,
+      "data_file": "systems/nh3_sto3g.json"
+    }
+  ]
+}

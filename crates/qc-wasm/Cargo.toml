@@ -1,0 +1,30 @@
+[package]
+name = "qc-wasm"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "WebAssembly bindings for qc-core algorithms"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+qc-core = { path = "../qc-core" }
+qc-io = { path = "../qc-io" }
+wasm-bindgen.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-wasm-bindgen.workspace = true
+js-sys.workspace = true
+thiserror.workspace = true
+wasm-bindgen-rayon = { workspace = true, optional = true }
+
+[dev-dependencies]
+approx.workspace = true
+serde_json.workspace = true
+
+[features]
+default = []
+parallel = ["wasm-bindgen-rayon", "qc-core/parallel"]
+simd = ["qc-core/simd"]
