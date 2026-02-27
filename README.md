@@ -214,16 +214,17 @@ Exportable artifacts include computation results and metadata for grading and re
 
 ## Citation
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18798310.svg)](https://doi.org/10.5281/zenodo.18798310)
+
 If you use IQCP in your research or teaching, please cite:
 
-> IQCP: Interactive Quantum Chemistry Playground. *Journal of Chemical Education* (forthcoming).
-
 ```bibtex
-@article{iqcp2026,
-  title   = {IQCP: Interactive Quantum Chemistry Playground},
-  journal = {Journal of Chemical Education},
-  year    = {2026},
-  note    = {Manuscript in preparation}
+@software{iqcp2026,
+  title  = {IQCP: Interactive Quantum Chemistry Playground},
+  author = {Sawatlon, Boodsarin and Paiboonvorachat, Nattapong and Vchirawongkwin, Viwat},
+  year   = {2026},
+  doi    = {10.5281/zenodo.18798310},
+  url    = {https://github.com/ExaPsi/IQCP}
 }
 ```
 

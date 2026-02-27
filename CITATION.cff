@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 title: "IQCP: Interactive Quantum Chemistry Playground"
-doi: "10.5281/zenodo.XXXXXXX"
+doi: "10.5281/zenodo.18798310"
 version: 1.0.0-study
 license: MIT
 type: software
