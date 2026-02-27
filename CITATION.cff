@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+title: "IQCP: Interactive Quantum Chemistry Playground"
+doi: "10.5281/zenodo.XXXXXXX"
+version: 1.0.0-study
+license: MIT
+type: software
+abstract: >-
+  Browser-based educational tool for exploring Boys functions,
+  Rys quadrature, and SCF convergence through transparent,
+  reproducible computation. All calculations run client-side
+  via WebAssembly with no installation required.
+message: "If you use this software, please cite it as below."
+authors:
+  - given-names: Boodsarin
+    family-names: Sawatlon
+    affiliation: "Department of Chemistry, Faculty of Science, Chulalongkorn University, Bangkok, Thailand"
+    orcid: "https://orcid.org/0000-0002-1600-022X"
+  - given-names: Nattapong
+    family-names: Paiboonvorachat
+    affiliation: "Department of Chemistry, Faculty of Science, Chulalongkorn University, Bangkok, Thailand"
+  - given-names: Viwat
+    family-names: Vchirawongkwin
+    email: viwat.v@chula.ac.th
+    affiliation: "Department of Chemistry, Faculty of Science, Chulalongkorn University, Bangkok, Thailand"
+    orcid: "https://orcid.org/0000-0001-5684-0752"
+keywords:
+  - quantum chemistry education
+  - WebAssembly
+  - self-consistent field
+  - interactive simulation
+  - Gaussian integrals
+  - DIIS convergence
+  - predict-observe-explain
+  - algorithm visualization
+repository-code: "https://github.com/ExaPsi/IQCP"
+url: "https://iqcp.dev"

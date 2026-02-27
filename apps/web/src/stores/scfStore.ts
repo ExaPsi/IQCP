@@ -1,12 +1,12 @@
 /**
  * SCF Module State Store
  *
- * Zustand store managing the state for Module E (SCF Sandbox).
+ * Zustand store managing the state for Module C (SCF Sandbox).
  * Handles parameter inputs, computation status, iteration history,
  * and URL synchronization.
  *
  * Unlike Modules B/C which auto-compute on parameter changes,
- * Module E uses explicit Run/Cancel buttons due to longer computation times.
+ * Module C uses explicit Run/Cancel buttons due to longer computation times.
  *
  * @module stores/scfStore
  */
@@ -290,7 +290,7 @@ const DEFAULT_STATE: ScfState = {
  * SCF state store.
  *
  * Manages parameter inputs, computation status, iteration history,
- * and URL synchronization for Module E.
+ * and URL synchronization for Module C.
  *
  * @example
  * ```typescript

@@ -1,7 +1,7 @@
 /**
  * Rys Module State Store
  *
- * Zustand store managing the state for Module C (Rys Quadrature Lab).
+ * Zustand store managing the state for Module B (Rys Quadrature Lab).
  * Handles parameter inputs, computation status, error curve status,
  * and URL synchronization.
  *
@@ -113,7 +113,7 @@ const DEFAULT_STATE: RysState = {
  * Rys quadrature state store.
  *
  * Manages parameter inputs (n, T, target), computation status,
- * error curve status, and URL synchronization for Module C.
+ * error curve status, and URL synchronization for Module B.
  *
  * @example
  * ```typescript

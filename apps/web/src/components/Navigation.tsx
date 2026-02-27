@@ -34,7 +34,7 @@ function NavItem({ to, label, description }: NavItemProps) {
 
 /**
  * Sidebar navigation component for module selection.
- * Provides keyboard-accessible navigation to Module B, C, and E.
+ * Provides keyboard-accessible navigation to Module A, B, and C.
  * Uses semantic HTML with proper ARIA labels.
  */
 function Navigation() {
@@ -52,17 +52,17 @@ function Navigation() {
           <ul className="space-y-1" role="list">
             <NavItem
               to="/boys"
-              label="Module B: Boys Function"
+              label="Module A: Boys Function"
               description="Explore F_m(T) evaluation"
             />
             <NavItem
               to="/rys"
-              label="Module C: Rys Quadrature"
+              label="Module B: Rys Quadrature"
               description="Roots and weights"
             />
             <NavItem
               to="/scf"
-              label="Module E: SCF Sandbox"
+              label="Module C: SCF Sandbox"
               description="RHF with DIIS"
             />
           </ul>

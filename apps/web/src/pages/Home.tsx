@@ -37,19 +37,19 @@ function Home() {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         <ModuleCard
           to="/boys"
-          title="Module B"
+          title="Module A"
           subtitle="Boys Function Lab"
           description="Explore the Boys function F_m(T) with regime-based evaluation. Visualize series, recurrence, and asymptotic methods."
         />
         <ModuleCard
           to="/rys"
-          title="Module C"
+          title="Module B"
           subtitle="Rys Quadrature Lab"
           description="Compute Rys polynomial roots and weights. Understand order-error tradeoffs in Gaussian integral evaluation."
         />
         <ModuleCard
           to="/scf"
-          title="Module E"
+          title="Module C"
           subtitle="SCF Sandbox"
           description="Run restricted Hartree-Fock calculations with optional DIIS acceleration. Inspect iteration-by-iteration convergence."
         />

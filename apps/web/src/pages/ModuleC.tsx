@@ -1,24 +1,25 @@
 /**
- * ModuleC - Rys Quadrature Lab page.
+ * ModuleC - SCF Sandbox page.
  *
- * Interactive exploration of Rys quadrature for computing roots
- * and weights used in Gaussian integral evaluation.
+ * Interactive self-consistent field (SCF) computation with
+ * optional DIIS acceleration. Run Hartree-Fock calculations
+ * on preset molecular systems and visualize convergence.
  *
  * @module pages/ModuleC
  */
 
 import { useEffect, useRef, useMemo, useCallback } from 'react';
-import { RysControlsPanel, RysResultDisplay } from '../components/rys';
-import { Math, MathBlock, MathDisplay } from '../components/common/Math';
+import { ScfControlsPanel, ScfResultDisplay, SystemInfoPanel } from '../components/scf';
 import { CopyLinkButton, ExportButton, ImportButton } from '../components/common';
-import { useRys } from '../hooks/useRys';
-import { useRysStore } from '../stores/rysStore';
+import { Math, MathBlock } from '../components/common/Math';
+import { useScf } from '../hooks/useScf';
+import { useScfStore } from '../stores/scfStore';
 import { getStateFromURL, hasStateInURL, updateURL, clearURL } from '../lib/url';
 import { createArtifact, downloadArtifact, restoreArtifact, getArtifactModule } from '../lib/artifact';
 import { DeepLinkError } from '../components/DeepLinkError';
-import { DEFAULT_RYS_STATE, APP_VERSION } from '../types/run-state';
+import { DEFAULT_SCF_STATE, APP_VERSION } from '../types/run-state';
 import type { RunStateV1 } from '../types/run-state';
-import type { RysArtifactResult, RunArtifactV1 } from '../types/run-artifact';
+import type { ScfArtifactResult, RunArtifactV1 } from '../types/run-artifact';
 
 /**
  * Simple debounce for URL updates.
@@ -50,29 +51,31 @@ function debounce<T extends (...args: Parameters<T>) => void>(
 /**
  * Debounce delay for URL updates (ms).
  *
- * Longer than compute debounce to avoid excessive URL changes.
+ * Longer than typical to avoid excessive URL changes during parameter adjustment.
  */
 const URL_DEBOUNCE_MS = 300;
 
 /**
- * Module C: Rys Quadrature Lab page.
+ * Module C: SCF Sandbox page.
  *
- * Provides interactive controls for exploring Rys quadrature roots and weights.
- * Integrates with the Web Worker for computation and supports deep linking.
+ * Provides interactive controls for running RHF SCF calculations
+ * on preset molecular systems. Unlike Modules A/B, this uses
+ * explicit Run/Cancel buttons due to longer computation times.
  */
 function ModuleC() {
-  const { isReady, workerError } = useRys();
+  const { isReady, workerError } = useScf();
 
   // Store state
-  const n = useRysStore((state) => state.n);
-  const T = useRysStore((state) => state.T);
-  const target = useRysStore((state) => state.target);
-  const mode = useRysStore((state) => state.mode);
-  const compute = useRysStore((state) => state.compute);
-  const errorCurve = useRysStore((state) => state.errorCurve);
-  const urlInitialized = useRysStore((state) => state.urlInitialized);
-  const initializeFromURL = useRysStore((state) => state.initializeFromURL);
-  const reset = useRysStore((state) => state.reset);
+  const systemId = useScfStore((state) => state.systemId);
+  const convergenceProfile = useScfStore((state) => state.convergenceProfile);
+  const maxIterations = useScfStore((state) => state.maxIterations);
+  const useDiis = useScfStore((state) => state.useDiis);
+  const mode = useScfStore((state) => state.mode);
+  const compute = useScfStore((state) => state.compute);
+  const history = useScfStore((state) => state.history);
+  const urlInitialized = useScfStore((state) => state.urlInitialized);
+  const initializeFromURL = useScfStore((state) => state.initializeFromURL);
+  const reset = useScfStore((state) => state.reset);
 
   // Track if URL had invalid state
   const invalidURLRef = useRef(false);
@@ -84,20 +87,20 @@ function ModuleC() {
     if (hasStateInURL()) {
       const urlState = getStateFromURL();
 
-      if (urlState && urlState.module === 'rys' && urlState.rys) {
-        // Valid Rys state from URL
-        initializeFromURL(urlState.rys);
-      } else if (urlState && urlState.module !== 'rys') {
+      if (urlState && urlState.module === 'scf' && urlState.scf) {
+        // Valid SCF state from URL
+        initializeFromURL(urlState.scf);
+      } else if (urlState && urlState.module !== 'scf') {
         // Valid state but wrong module - use defaults
-        initializeFromURL(DEFAULT_RYS_STATE.rys!);
+        initializeFromURL(DEFAULT_SCF_STATE.scf!);
       } else {
         // Invalid URL state
         invalidURLRef.current = true;
-        initializeFromURL(DEFAULT_RYS_STATE.rys!);
+        initializeFromURL(DEFAULT_SCF_STATE.scf!);
       }
     } else {
       // No URL state - use defaults
-      initializeFromURL(DEFAULT_RYS_STATE.rys!);
+      initializeFromURL(DEFAULT_SCF_STATE.scf!);
     }
   }, [urlInitialized, initializeFromURL]);
 
@@ -106,15 +109,21 @@ function ModuleC() {
     () =>
       debounce(
         (
-          newN: number,
-          newT: number,
-          newTarget: '1e-4' | '1e-6' | '1e-8'
+          newSystemId: string,
+          newConv: 'loose' | 'medium' | 'tight',
+          newMaxIter: number,
+          newDiis: boolean
         ) => {
           const state: RunStateV1 = {
             schema_version: 'run_state_v1',
             app_version: APP_VERSION,
-            module: 'rys',
-            rys: { n: newN, T: newT, target: newTarget },
+            module: 'scf',
+            scf: {
+              system_id: newSystemId,
+              conv: newConv,
+              max_iter: newMaxIter,
+              diis: newDiis,
+            },
             ui: { mode: 'explain' },
           };
           updateURL(state);
@@ -128,12 +137,12 @@ function ModuleC() {
   useEffect(() => {
     if (!urlInitialized) return;
 
-    debouncedUpdateURL(n, T, target);
+    debouncedUpdateURL(systemId, convergenceProfile, maxIterations, useDiis);
 
     return () => {
       debouncedUpdateURL.cancel();
     };
-  }, [n, T, target, urlInitialized, debouncedUpdateURL]);
+  }, [systemId, convergenceProfile, maxIterations, useDiis, urlInitialized, debouncedUpdateURL]);
 
   // Handle reset from invalid URL
   const handleReset = useCallback(() => {
@@ -152,43 +161,68 @@ function ModuleC() {
     const state: RunStateV1 = {
       schema_version: 'run_state_v1',
       app_version: APP_VERSION,
-      module: 'rys',
-      rys: { n, T, target },
+      module: 'scf',
+      scf: {
+        system_id: systemId,
+        conv: convergenceProfile,
+        max_iter: maxIterations,
+        diis: useDiis,
+      },
       ui: { mode },
     };
 
-    // Build error curve data if available
-    const errorCurveData =
-      errorCurve.status === 'success'
-        ? errorCurve.result.points.map((point) => ({
-            n: point.n,
-            max_error: point.maxError,
-          }))
+    // Build trace from history
+    const trace = history.map((iter) => ({
+      iteration: iter.iteration,
+      energy: iter.energy,
+      delta: iter.delta,
+      diis_error: iter.diisError,
+    }));
+
+    // Include orbital energies if in internals mode and available
+    const orbitalEnergies =
+      mode === 'internals' && result.orbitalEnergies
+        ? result.orbitalEnergies.energies
         : undefined;
 
-    // Create RysArtifactResult from compute result
-    const artifactResult: RysArtifactResult = {
-      type: 'rys',
+    const homoLumoGap =
+      mode === 'internals' && result.orbitalEnergies
+        ? (() => {
+            const energies = result.orbitalEnergies.energies;
+            const nOcc = result.orbitalEnergies.nOccupied;
+            if (nOcc > 0 && nOcc < energies.length) {
+              return energies[nOcc] - energies[nOcc - 1];
+            }
+            return undefined;
+          })()
+        : undefined;
+
+    // Create ScfArtifactResult from compute result
+    const artifactResult: ScfArtifactResult = {
+      type: 'scf',
       data: {
-        roots: result.roots,
-        weights: result.weights,
-        error_curve: errorCurveData,
-        reconstruction_error: 0, // Not computed in current implementation
+        energy: result.energy,
+        converged: result.converged,
+        iterations: result.iterations,
+        aborted: result.aborted,
+        trace,
+        orbital_energies: orbitalEnergies,
+        homo_lumo_gap: homoLumoGap,
       },
     };
 
     // Create and download the artifact
     const artifact = createArtifact(state, artifactResult);
     downloadArtifact(artifact);
-  }, [compute, errorCurve, n, T, target, mode]);
+  }, [compute, history, systemId, convergenceProfile, maxIterations, useDiis, mode]);
 
   // Handle import of artifact
   const handleImport = useCallback((artifact: RunArtifactV1) => {
     // Check if artifact is for the correct module
     const artifactModule = getArtifactModule(artifact);
-    if (artifactModule !== 'rys') {
+    if (artifactModule !== 'scf') {
       console.warn(
-        `Artifact is for module '${artifactModule}', but you're on Module C (Rys). ` +
+        `Artifact is for module '${artifactModule}', but you're on Module C (SCF). ` +
         `Please navigate to the correct module to import this artifact.`
       );
       return;
@@ -232,16 +266,16 @@ function ModuleC() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-800 mb-2">
-            Module C: Rys Quadrature Lab
+            Module C: SCF Sandbox
           </h1>
           <p className="text-slate-600">
-            Interactive exploration of Rys quadrature roots and weights for
-            Gaussian integral evaluation.
+            Interactive self-consistent field computation with optional DIIS acceleration.
+            Explore how RHF calculations converge for different molecular systems.
           </p>
         </div>
         <div className="flex gap-2">
@@ -266,15 +300,18 @@ function ModuleC() {
       )}
 
       {/* Main content grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Controls panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+        {/* Controls and System Info panel - independently scrollable */}
         <div className="lg:col-span-1">
-          <RysControlsPanel disabled={!isReady} />
+          <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overflow-x-hidden scrollbar-thin scrollbar-on-hover lg:pr-1 space-y-4">
+            <ScfControlsPanel disabled={!isReady} />
+            <SystemInfoPanel systemId={systemId} />
+          </div>
         </div>
 
         {/* Result display */}
-        <div className="lg:col-span-2">
-          <RysResultDisplay />
+        <div className="lg:col-span-3">
+          <ScfResultDisplay />
         </div>
       </div>
 
@@ -285,138 +322,97 @@ function ModuleC() {
         </h2>
         <div className="text-slate-600 text-sm space-y-3">
           <p>
-            Rys quadrature provides specialized Gaussian quadrature rules for
-            integrals involving the Rys weight function:
+            The Hartree-Fock method seeks the ground-state electronic energy by
+            optimizing a single Slater determinant wavefunction. The procedure
+            is iterative because the Fock matrix depends on the density matrix,
+            which depends on the molecular orbitals, which are eigenvectors of
+            the Fock matrix.
           </p>
-          <MathBlock label="Rys Weight Function">
-            {`w_T(x) = x^{-1/2} e^{-Tx}, \\quad x \\in [0,1]`}
+
+          {/* Roothaan-Hall Equation */}
+          <MathBlock label="Roothaan-Hall Equation">
+            {String.raw`\mathbf{F}\mathbf{C} = \mathbf{S}\mathbf{C}\boldsymbol{\varepsilon}`}
           </MathBlock>
 
-          {/* Main Quadrature Formula */}
-          <h3 className="font-semibold text-slate-700 mt-4 mb-2">
-            Quadrature Approximation
-          </h3>
           <p>
-            The quadrature rule approximates integrals with the Rys weight function:
+            The <Math>{String.raw`\mathbf{F}`}</Math> (Fock matrix) is the effective one-electron
+            Hamiltonian that includes electron-electron interactions. The <Math>{String.raw`\mathbf{C}`}</Math> matrix
+            contains the molecular orbital coefficients, <Math>{String.raw`\mathbf{S}`}</Math> is the overlap
+            matrix, and <Math>{String.raw`\boldsymbol{\varepsilon}`}</Math> are the orbital energies.
           </p>
-          <MathBlock label="Quadrature Formula">
-            {`\\int_0^1 f(t^2) e^{-Tt^2} dt \\approx \\sum_{i=1}^{n} w_i f(t_i^2)`}
+
+          {/* Fock Matrix */}
+          <MathBlock label="Fock Matrix Construction">
+            {String.raw`F_{\mu\nu} = H_{\mu\nu}^{\text{core}} + G_{\mu\nu}`}
           </MathBlock>
 
-          {/* Boys-to-Moments Correspondence */}
-          <h3 className="font-semibold text-slate-700 mt-4 mb-2">
-            Boys Functions as Moments
-          </h3>
           <p>
-            The Boys function <Math>{'F_n(T)'}</Math> equals half the n-th moment of the Rys weight function:
+            The two-electron contribution <Math>{String.raw`G_{\mu\nu}`}</Math> includes both
+            Coulomb and exchange interactions:
           </p>
-          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200 mt-3">
-            <MathDisplay>
-              {`\\mu_k(T) = \\int_0^1 x^k w_T(x)\\, dx = \\mathbf{2F_k(T)}`}
-            </MathDisplay>
-            <p className="text-blue-700 text-xs">
-              This correspondence is the foundation of Rys quadrature: computing Boys functions is equivalent to computing moments of <Math>{'w_T'}</Math>.
-            </p>
-          </div>
 
-          {/* Hankel Matrix */}
-          <h3 className="font-semibold text-slate-700 mt-4 mb-2">
-            Hankel Matrix Structure
-          </h3>
+          <MathBlock label="Two-Electron Contribution">
+            {String.raw`G_{\mu\nu} = \sum_{\lambda\sigma} P_{\lambda\sigma}\left[(\mu\nu|\lambda\sigma) - \frac{1}{2}(\mu\lambda|\nu\sigma)\right]`}
+          </MathBlock>
+
+          {/* Density Matrix */}
+          <MathBlock label="Density Matrix">
+            {String.raw`P_{\mu\nu} = 2\sum_i^{\text{occ}} C_{\mu i} C_{\nu i}`}
+          </MathBlock>
+
+          {/* Energy Expression */}
+          <MathBlock label="Total Electronic Energy">
+            {String.raw`E = \frac{1}{2}\text{Tr}[\mathbf{P}(\mathbf{H}^{\text{core}} + \mathbf{F})] + V_{nn}`}
+          </MathBlock>
+
           <p>
-            The moments form a symmetric Hankel matrix <Math>{'H'}</Math> where <Math>{'H_{ij} = \\mu_{i+j}'}</Math>:
+            The Self-Consistent Field (SCF) procedure repeats until the density
+            matrix (or energy) converges within a specified tolerance:
           </p>
-          <div className="bg-white rounded-lg p-4 border border-slate-200 mt-2 overflow-x-auto">
-            <MathDisplay>
-              {`H = \\begin{pmatrix} \\mu_0 & \\mu_1 & \\mu_2 \\\\ \\mu_1 & \\mu_2 & \\mu_3 \\\\ \\mu_2 & \\mu_3 & \\mu_4 \\end{pmatrix}`}
-            </MathDisplay>
-            <p className="text-xs text-slate-500 mt-2 text-center">Example: 3x3 Hankel matrix for <Math>{'n_r = 3'}</Math></p>
-          </div>
 
-          {/* Algorithm 5.1 Pipeline */}
-          <h3 className="font-semibold text-slate-700 mt-4 mb-2">
-            Algorithm 5.1: Moments to Nodes/Weights
-          </h3>
-          <div className="bg-gradient-to-r from-blue-50 via-green-50 to-purple-50 rounded-lg p-4 border border-slate-200">
-            <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-medium">
-              <span className="bg-blue-100 text-blue-800 px-3 py-1.5 rounded-full border border-blue-200">
-                1. <Math>{'\\mu_k = 2F_k(T)'}</Math>
-              </span>
-              <span className="text-slate-400">then</span>
-              <span className="bg-blue-100 text-blue-800 px-3 py-1.5 rounded-full border border-blue-200">
-                2. <Math>{'H, H^{(1)}'}</Math>
-              </span>
-              <span className="text-slate-400">then</span>
-              <span className="bg-green-100 text-green-800 px-3 py-1.5 rounded-full border border-green-200">
-                3. <Math>{'H = LL^T'}</Math>
-              </span>
-              <span className="text-slate-400">then</span>
-              <span className="bg-green-100 text-green-800 px-3 py-1.5 rounded-full border border-green-200">
-                4. <Math>{'J = L^{-1} H^{(1)} L^{-T}'}</Math>
-              </span>
-              <span className="text-slate-400">then</span>
-              <span className="bg-purple-100 text-purple-800 px-3 py-1.5 rounded-full border border-purple-200">
-                5. Eigendecompose <Math>{'J'}</Math>
-              </span>
-              <span className="text-slate-400">then</span>
-              <span className="bg-purple-100 text-purple-800 px-3 py-1.5 rounded-full border border-purple-200">
-                6. Nodes/Weights
-              </span>
-            </div>
-            <p className="text-xs text-slate-600 mt-3 text-center">
-              <Math>{'C = L^{-1}'}</Math> transforms monomials to orthonormal polynomials (Gram-Schmidt via Cholesky)
-            </p>
-          </div>
+          <ol className="list-decimal list-inside space-y-1 ml-2">
+            <li>Form initial guess for density matrix <Math>{String.raw`\mathbf{P}`}</Math></li>
+            <li>Build Fock matrix <Math>{String.raw`\mathbf{F}`}</Math> from <Math>{String.raw`\mathbf{P}`}</Math></li>
+            <li>Solve generalized eigenvalue problem <Math>{String.raw`\mathbf{FC} = \mathbf{SC}\boldsymbol{\varepsilon}`}</Math></li>
+            <li>Form new density matrix from occupied orbitals</li>
+            <li>Check convergence; if not converged, go to step 2</li>
+          </ol>
 
-          {/* Golub-Welsch Theorem */}
-          <h3 className="font-semibold text-slate-700 mt-4 mb-2">
-            Golub-Welsch Theorem
-          </h3>
-          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-            <MathDisplay>
-              {`t_i = \\text{eigenvalues of } J, \\quad w_i = \\mu_0 \\cdot (V_{0i})^2`}
-            </MathDisplay>
-            <p className="text-green-700 text-xs">
-              <Math>{'V_{0i}'}</Math> is the first component of the normalized eigenvector for eigenvalue <Math>{'t_i'}</Math>.
-              The weights are always positive because <Math>{'\\mu_0 > 0'}</Math> and <Math>{'(V_{0i})^2 > 0'}</Math>.
-            </p>
-          </div>
+          {/* Convergence Criteria */}
+          <MathBlock label="Convergence Criteria">
+            {String.raw`\Delta E < \epsilon \quad \text{and} \quad \|\mathbf{P}_{n} - \mathbf{P}_{n-1}\| < \delta`}
+          </MathBlock>
 
-          {/* Root Count Rule */}
-          <h3 className="font-semibold text-slate-700 mt-4 mb-2">
-            Root Count Rule for ERIs
-          </h3>
-          <div className="bg-violet-50 rounded-lg p-4 border border-violet-200">
-            <MathDisplay>
-              {`n_r = \\left\\lfloor \\frac{L}{2} \\right\\rfloor + 1, \\quad \\text{where } L = l_a + l_b + l_c + l_d`}
-            </MathDisplay>
-            <p className="text-violet-700 text-xs mb-2">
-              For a shell quartet <Math>{'(l_a l_b | l_c l_d)'}</Math> with total angular momentum <Math>{'L'}</Math>, an <Math>{'n_r'}</Math>-point quadrature is exact for polynomials of degree <Math>{'\\leq 2n_r-1'}</Math>.
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-violet-200">
-                    <th className="text-left py-1 px-2 text-violet-800">Shell Quartet</th>
-                    <th className="text-center py-1 px-2 text-violet-800"><Math>{'L'}</Math></th>
-                    <th className="text-center py-1 px-2 text-violet-800"><Math>{'n_r'}</Math></th>
-                    <th className="text-left py-1 px-2 text-violet-800">Boys orders</th>
-                  </tr>
-                </thead>
-                <tbody className="text-violet-700">
-                  <tr><td className="py-1 px-2"><Math>{'(ss|ss)'}</Math></td><td className="text-center py-1 px-2">0</td><td className="text-center py-1 px-2">1</td><td className="py-1 px-2"><Math>{'F_0'}</Math></td></tr>
-                  <tr><td className="py-1 px-2"><Math>{'(ps|ss)'}</Math></td><td className="text-center py-1 px-2">1</td><td className="text-center py-1 px-2">1</td><td className="py-1 px-2"><Math>{'F_0, F_1'}</Math></td></tr>
-                  <tr><td className="py-1 px-2"><Math>{'(pp|ss)'}</Math></td><td className="text-center py-1 px-2">2</td><td className="text-center py-1 px-2">2</td><td className="py-1 px-2"><Math>{'F_0 \\ldots F_3'}</Math></td></tr>
-                  <tr><td className="py-1 px-2"><Math>{'(pp|pp)'}</Math></td><td className="text-center py-1 px-2">4</td><td className="text-center py-1 px-2">3</td><td className="py-1 px-2"><Math>{'F_0 \\ldots F_5'}</Math></td></tr>
-                  <tr><td className="py-1 px-2"><Math>{'(dd|pp)'}</Math></td><td className="text-center py-1 px-2">6</td><td className="text-center py-1 px-2">4</td><td className="py-1 px-2"><Math>{'F_0 \\ldots F_7'}</Math></td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <p>
+            <strong>DIIS (Direct Inversion in the Iterative Subspace)</strong>{' '}
+            accelerates convergence by extrapolating from a history of previous
+            Fock matrices:
+          </p>
+
+          {/* DIIS Extrapolation */}
+          <MathBlock label="DIIS Extrapolation">
+            {String.raw`\mathbf{F}' = \sum_i c_i \mathbf{F}_i`}
+          </MathBlock>
+
+          <p>
+            The DIIS error vector measures the deviation from self-consistency:
+          </p>
+
+          <MathBlock label="DIIS Error Vector">
+            {String.raw`\mathbf{e}_i = \mathbf{F}_i \mathbf{P}_i \mathbf{S} - \mathbf{S} \mathbf{P}_i \mathbf{F}_i`}
+          </MathBlock>
+
+          <p>
+            The coefficients <Math>{String.raw`c_i`}</Math> are determined by minimizing
+            the norm of the extrapolated error vector subject to the
+            constraint <Math>{String.raw`\sum_i c_i = 1`}</Math>.
+          </p>
 
           <p className="text-xs text-slate-500 mt-4">
-            Reference: Dupuis, M., Rys, J., & King, H. F. (1976).{' '}
-            <em>J. Chem. Phys.</em>, 65, 111-116. See also lecture notes Chapter 5 for Algorithm 5.1.
+            References: Pulay, P. (1980). Convergence acceleration of iterative sequences.{' '}
+            <em>Chem. Phys. Lett.</em> 73, 393-398.
+            Pulay, P. (1982). Improved SCF convergence acceleration.{' '}
+            <em>J. Comput. Chem.</em> 3, 556-560.
           </p>
         </div>
       </div>

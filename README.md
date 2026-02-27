@@ -9,9 +9,9 @@ A browser-based educational web application for teaching quantum chemistry conce
 
 ## Overview
 
-IQCP enables students to interactively explore **Boys functions**, **Rys quadrature**, and **SCF convergence** through transparent, reproducible computation - all within a web browser with no installation required.
+IQCP enables students to interactively explore **Boys functions**, **Rys quadrature**, and **SCF convergence** through transparent, reproducible computation—all within a web browser with no installation required.
 
-**Publication:** This software accompanies a Technology Report submitted to the *Journal of Chemical Education*.
+**Target Publication:** *Journal of Chemical Education* Technology Report
 
 ### Key Features
 
@@ -22,56 +22,59 @@ IQCP enables students to interactively explore **Boys functions**, **Rys quadrat
 - **Custom Molecules:** Enter arbitrary geometries and compute integrals on-the-fly (5 basis sets)
 - **Educational Focus:** Designed for classroom use with guided lab activities
 
-## Architecture
-
-```
-Browser SPA (React + TypeScript + Vite)
-    | postMessage
-Web Worker (non-blocking computation)
-    | wasm-bindgen
-qc-wasm (Rust WASM module)
-    |
-qc-core (pure Rust algorithms)
-```
-
-All heavy computation runs in a Web Worker to keep the UI responsive.
-
 ## Core Modules
 
-### Module B: Boys Function Lab
+### Module A: Boys Function Lab
+
 Interactive exploration of F_m(T) with regime visualization:
 - **Series expansion** (T < 12): Taylor expansion with double factorial
-- **Recurrence** (12 <= T < 30): erf(sqrt(T)) + upward recurrence
-- **Asymptotic** (T >= 30): Asymptotic series expansion
+- **Recurrence** (12 ≤ T < 30): erf(√T) + upward recurrence
+- **Asymptotic** (T ≥ 30): Asymptotic series expansion
 
-### Module C: Rys Quadrature Lab
+### Module B: Rys Quadrature Lab
+
 Roots and weights computation for Gaussian integrals:
 - Moment computation via Boys functions
 - Modified Chebyshev algorithm for recurrence coefficients
 - Eigenvalue decomposition for roots and weights
 - Order-error tradeoff visualization
 
-### Module E: SCF Sandbox (RHF)
+### Module C: SCF Sandbox (RHF)
+
 Restricted Hartree-Fock self-consistent field calculations:
 - Interactive convergence visualization
 - DIIS acceleration toggle
 - Matrix inspection (Fock, density, coefficients)
 - Convergence profiles: loose (1e-4), medium (1e-6), tight (1e-8)
 
+## Architecture
+
+```
+Browser SPA (React + TypeScript + Vite)
+    ↓ postMessage
+Web Worker (non-blocking computation)
+    ↓ wasm-bindgen
+qc-wasm (Rust WASM module)
+    ↓
+qc-core (pure Rust algorithms)
+```
+
+All heavy computation runs in a Web Worker to keep the UI responsive.
+
 ## Getting Started
 
 ### Try It Now
 
-Visit [https://iqcp.dev](https://iqcp.dev) to use IQCP directly in your browser - no installation required.
+Visit [https://iqcp.dev](https://iqcp.dev) to use IQCP directly in your browser—no installation required.
 
-### Building from Source
+### Local Development
 
 #### Prerequisites
 
 - **Rust** (stable, 1.70+)
 - **wasm-pack** (`cargo install wasm-pack`)
 - **Node.js** (18+)
-- **npm**
+- **npm** or **pnpm**
 
 #### Installation
 
@@ -108,6 +111,7 @@ IQCP/
 │       │   ├── lib/         # Utilities
 │       │   ├── stores/      # Zustand state management
 │       │   ├── types/       # TypeScript types
+│       │   ├── wasm/        # Built WASM module
 │       │   └── worker/      # Web Worker
 │       └── ...
 ├── crates/
@@ -125,9 +129,45 @@ IQCP/
     └── golden/              # Golden test reference data
 ```
 
+## Development
+
+### Common Commands
+
+```bash
+# Rust
+cargo build --workspace              # Build all crates
+cargo test --workspace               # Run all tests
+cargo fmt --all                      # Format code
+cargo clippy --workspace             # Lint code
+
+# WASM
+wasm-pack build crates/qc-wasm --release --target web --out-dir ../../apps/web/src/wasm
+
+# Web (from apps/web/)
+npm run dev                          # Start dev server
+npm run build                        # Production build
+npm run lint                         # Lint TypeScript
+npm run typecheck                    # Type check
+```
+
+### Pre-Commit Checklist
+
+```bash
+# Rust checks
+cargo fmt --all -- --check
+cargo clippy --workspace -- -D warnings
+cargo test --workspace
+
+# Web checks (from apps/web/)
+npm run lint
+npm run typecheck
+npm run build
+```
+
 ## Technology Stack
 
 ### Frontend
+
 - React 18+ with TypeScript (strict mode)
 - Vite for bundling
 - TailwindCSS for styling
@@ -135,6 +175,7 @@ IQCP/
 - Plotly.js for interactive plots
 
 ### Compute
+
 - Rust (stable)
 - wasm-bindgen + wasm-pack
 - serde + serde-wasm-bindgen
@@ -150,6 +191,15 @@ IQCP/
 | SCF energy | 1e-8 Ha | Final converged value |
 | SCF density | 1e-6 | Frobenius norm |
 
+## Performance Targets
+
+| Metric | Target |
+|--------|--------|
+| Slider latency | ≤ 200ms |
+| Input debouncing | 100ms |
+| WASM bundle size | < 500KB gzipped |
+| Cross-browser reproducibility | Deterministic within tolerances |
+
 ## Deep Links and Artifacts
 
 Every module state is URL-encodable for sharing and reproducibility:
@@ -160,14 +210,22 @@ https://iqcp.dev/rys?s=<base64-encoded-state>
 https://iqcp.dev/scf?s=<base64-encoded-state>
 ```
 
-Exportable artifacts include computation results and metadata for assessment and reproducibility.
+Exportable artifacts include computation results and metadata for grading and reproducibility.
 
-## Lab Materials
+## Citation
 
-The `content/labpack1/` directory contains guided lab activities:
-- Student worksheets with deep links to pre-configured calculations
-- Instructor answer keys and grading rubrics
-- Performance assessment rubrics aligned with learning objectives
+If you use IQCP in your research or teaching, please cite:
+
+> IQCP: Interactive Quantum Chemistry Playground. *Journal of Chemical Education* (forthcoming).
+
+```bibtex
+@article{iqcp2026,
+  title   = {IQCP: Interactive Quantum Chemistry Playground},
+  journal = {Journal of Chemical Education},
+  year    = {2026},
+  note    = {Manuscript in preparation}
+}
+```
 
 ## References
 
@@ -177,23 +235,13 @@ The `content/labpack1/` directory contains guided lab activities:
 - **Rys quadrature:** Dupuis, M., Rys, J., & King, H. F. (1976). *J. Chem. Phys.*, 65, 111-116.
 - **DIIS acceleration:** Pulay, P. (1980). *Chem. Phys. Lett.*, 73, 393-398; (1982). *J. Comput. Chem.*, 3, 556-560.
 
-## Citation
+## Contributing
 
-If you use IQCP in your teaching or research, please cite:
-
-```bibtex
-@software{iqcp2026,
-  author = {{IQCP Contributors}},
-  title = {Interactive Quantum Chemistry Playground (IQCP)},
-  year = {2026},
-  url = {https://github.com/ExaPsi/IQCP},
-  note = {Supporting Information for J. Chem. Educ.}
-}
-```
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License—see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 

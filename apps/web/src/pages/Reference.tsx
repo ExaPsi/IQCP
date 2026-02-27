@@ -102,9 +102,9 @@ function Reference() {
       </p>
 
       <div className="space-y-4">
-        {/* Module B: Boys Function */}
+        {/* Module A: Boys Function */}
         <CollapsibleSection
-          title="Module B: Boys Function F_m(T)"
+          title="Module A: Boys Function F_m(T)"
           id="boys"
           expandedSection={expandedSection}
           onToggle={handleToggle}
@@ -243,9 +243,9 @@ function Reference() {
           </Subsection>
         </CollapsibleSection>
 
-        {/* Module C: Rys Quadrature */}
+        {/* Module B: Rys Quadrature */}
         <CollapsibleSection
-          title="Module C: Rys Quadrature"
+          title="Module B: Rys Quadrature"
           id="rys"
           expandedSection={expandedSection}
           onToggle={handleToggle}
@@ -483,9 +483,9 @@ function Reference() {
           </Subsection>
         </CollapsibleSection>
 
-        {/* Module E: SCF/DIIS */}
+        {/* Module C: SCF/DIIS */}
         <CollapsibleSection
-          title="Module E: SCF and DIIS Acceleration"
+          title="Module C: SCF and DIIS Acceleration"
           id="scf"
           expandedSection={expandedSection}
           onToggle={handleToggle}
@@ -840,7 +840,7 @@ function Reference() {
             onClick={() => setExpandedSection('boys')}
             className="text-left p-3 bg-white rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
           >
-            <div className="font-medium text-slate-700">Module B</div>
+            <div className="font-medium text-slate-700">Module A</div>
             <div className="text-sm text-slate-500">
               Boys Function <Math>F_m(T)</Math>
             </div>
@@ -849,14 +849,14 @@ function Reference() {
             onClick={() => setExpandedSection('rys')}
             className="text-left p-3 bg-white rounded-lg border border-slate-200 hover:border-green-300 hover:bg-green-50 transition-colors"
           >
-            <div className="font-medium text-slate-700">Module C</div>
+            <div className="font-medium text-slate-700">Module B</div>
             <div className="text-sm text-slate-500">Rys Quadrature</div>
           </button>
           <button
             onClick={() => setExpandedSection('scf')}
             className="text-left p-3 bg-white rounded-lg border border-slate-200 hover:border-purple-300 hover:bg-purple-50 transition-colors"
           >
-            <div className="font-medium text-slate-700">Module E</div>
+            <div className="font-medium text-slate-700">Module C</div>
             <div className="text-sm text-slate-500">SCF and DIIS</div>
           </button>
         </div>

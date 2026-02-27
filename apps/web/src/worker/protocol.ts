@@ -153,7 +153,7 @@ export interface PingRequest extends BaseRequest {
 /**
  * Boys function evaluation at a single point.
  *
- * @see Module B - Boys Function Lab
+ * @see Module A - Boys Function Lab
  */
 export interface BoysEvalRequest extends BaseRequest {
   type: 'boys_eval';
@@ -181,7 +181,7 @@ export interface BoysSweepRequest extends BaseRequest {
 /**
  * Rys quadrature roots and weights computation.
  *
- * @see Module C - Rys Quadrature Lab
+ * @see Module B - Rys Quadrature Lab
  */
 export interface RysComputeRequest extends BaseRequest {
   type: 'rys_compute';
@@ -207,7 +207,7 @@ export interface RysErrorCurveRequest extends BaseRequest {
 /**
  * SCF (Self-Consistent Field) computation request.
  *
- * @see Module E - SCF Sandbox
+ * @see Module C - SCF Sandbox
  */
 export interface ScfRunRequest extends BaseRequest {
   type: 'scf_run';

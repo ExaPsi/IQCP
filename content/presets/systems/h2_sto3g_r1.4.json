@@ -2,7 +2,7 @@
   "format_version": 1,
   "system_id": "h2_sto3g_r1.4",
   "label": "H2 (STO-3G, R=1.4 bohr)",
-  "description": "Hydrogen molecule at equilibrium bond length. Reference system for IQCP Module E.",
+  "description": "Hydrogen molecule at equilibrium bond length. Reference system for IQCP Module C.",
   "geometry": {
     "atoms": [
       {

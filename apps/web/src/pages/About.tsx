@@ -47,7 +47,7 @@ function About() {
           <div className="space-y-4">
             <div className="border-l-4 border-primary-500 pl-4">
               <h3 className="font-semibold text-slate-800">
-                Module B: Boys Function Lab
+                Module A: Boys Function Lab
               </h3>
               <p className="text-slate-600 text-sm mt-1">
                 Explore the Boys function F_m(T) with interactive regime
@@ -58,7 +58,7 @@ function About() {
             </div>
             <div className="border-l-4 border-primary-500 pl-4">
               <h3 className="font-semibold text-slate-800">
-                Module C: Rys Quadrature Lab
+                Module B: Rys Quadrature Lab
               </h3>
               <p className="text-slate-600 text-sm mt-1">
                 Compute Rys polynomial roots and weights. Visualize order-error
@@ -68,7 +68,7 @@ function About() {
             </div>
             <div className="border-l-4 border-primary-500 pl-4">
               <h3 className="font-semibold text-slate-800">
-                Module E: SCF Sandbox
+                Module C: SCF Sandbox
               </h3>
               <p className="text-slate-600 text-sm mt-1">
                 Run restricted Hartree-Fock calculations with optional DIIS

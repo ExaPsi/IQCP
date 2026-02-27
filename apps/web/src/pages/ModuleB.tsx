@@ -1,23 +1,24 @@
 /**
- * ModuleB - Boys Function Lab page.
+ * ModuleB - Rys Quadrature Lab page.
  *
- * Interactive exploration of the Boys function F_m(T) with
- * regime-based evaluation strategies.
+ * Interactive exploration of Rys quadrature for computing roots
+ * and weights used in Gaussian integral evaluation.
  *
  * @module pages/ModuleB
  */
 
 import { useEffect, useRef, useMemo, useCallback } from 'react';
-import { BoysControlsPanel, BoysResultDisplay } from '../components/boys';
-import { CopyLinkButton, ExportButton, ImportButton, Math as MathInline, MathBlock } from '../components/common';
-import { useBoys } from '../hooks/useBoys';
-import { useBoysStore } from '../stores/boysStore';
+import { RysControlsPanel, RysResultDisplay } from '../components/rys';
+import { Math, MathBlock, MathDisplay } from '../components/common/Math';
+import { CopyLinkButton, ExportButton, ImportButton } from '../components/common';
+import { useRys } from '../hooks/useRys';
+import { useRysStore } from '../stores/rysStore';
 import { getStateFromURL, hasStateInURL, updateURL, clearURL } from '../lib/url';
 import { createArtifact, downloadArtifact, restoreArtifact, getArtifactModule } from '../lib/artifact';
 import { DeepLinkError } from '../components/DeepLinkError';
-import { DEFAULT_BOYS_STATE, APP_VERSION } from '../types/run-state';
+import { DEFAULT_RYS_STATE, APP_VERSION } from '../types/run-state';
 import type { RunStateV1 } from '../types/run-state';
-import type { BoysArtifactResult, RunArtifactV1 } from '../types/run-artifact';
+import type { RysArtifactResult, RunArtifactV1 } from '../types/run-artifact';
 
 /**
  * Simple debounce for URL updates.
@@ -54,23 +55,24 @@ function debounce<T extends (...args: Parameters<T>) => void>(
 const URL_DEBOUNCE_MS = 300;
 
 /**
- * Module B: Boys Function Lab page.
+ * Module B: Rys Quadrature Lab page.
  *
- * Provides interactive controls for exploring the Boys function F_m(T).
+ * Provides interactive controls for exploring Rys quadrature roots and weights.
  * Integrates with the Web Worker for computation and supports deep linking.
  */
 function ModuleB() {
-  const { isReady, workerError } = useBoys();
+  const { isReady, workerError } = useRys();
 
   // Store state
-  const m = useBoysStore((state) => state.m);
-  const T = useBoysStore((state) => state.T);
-  const view = useBoysStore((state) => state.view);
-  const mode = useBoysStore((state) => state.mode);
-  const compute = useBoysStore((state) => state.compute);
-  const urlInitialized = useBoysStore((state) => state.urlInitialized);
-  const initializeFromURL = useBoysStore((state) => state.initializeFromURL);
-  const reset = useBoysStore((state) => state.reset);
+  const n = useRysStore((state) => state.n);
+  const T = useRysStore((state) => state.T);
+  const target = useRysStore((state) => state.target);
+  const mode = useRysStore((state) => state.mode);
+  const compute = useRysStore((state) => state.compute);
+  const errorCurve = useRysStore((state) => state.errorCurve);
+  const urlInitialized = useRysStore((state) => state.urlInitialized);
+  const initializeFromURL = useRysStore((state) => state.initializeFromURL);
+  const reset = useRysStore((state) => state.reset);
 
   // Track if URL had invalid state
   const invalidURLRef = useRef(false);
@@ -82,36 +84,43 @@ function ModuleB() {
     if (hasStateInURL()) {
       const urlState = getStateFromURL();
 
-      if (urlState && urlState.module === 'boys' && urlState.boys) {
-        // Valid Boys state from URL
-        initializeFromURL(urlState.boys);
-      } else if (urlState && urlState.module !== 'boys') {
+      if (urlState && urlState.module === 'rys' && urlState.rys) {
+        // Valid Rys state from URL
+        initializeFromURL(urlState.rys);
+      } else if (urlState && urlState.module !== 'rys') {
         // Valid state but wrong module - use defaults
-        initializeFromURL(DEFAULT_BOYS_STATE.boys!);
+        initializeFromURL(DEFAULT_RYS_STATE.rys!);
       } else {
         // Invalid URL state
         invalidURLRef.current = true;
-        initializeFromURL(DEFAULT_BOYS_STATE.boys!);
+        initializeFromURL(DEFAULT_RYS_STATE.rys!);
       }
     } else {
       // No URL state - use defaults
-      initializeFromURL(DEFAULT_BOYS_STATE.boys!);
+      initializeFromURL(DEFAULT_RYS_STATE.rys!);
     }
   }, [urlInitialized, initializeFromURL]);
 
   // Create debounced URL update function
   const debouncedUpdateURL = useMemo(
     () =>
-      debounce((newM: number, newT: number, newView: 'single' | 'sweep') => {
-        const state: RunStateV1 = {
-          schema_version: 'run_state_v1',
-          app_version: APP_VERSION,
-          module: 'boys',
-          boys: { m: newM, T: newT, view: newView },
-          ui: { mode: 'explain' },
-        };
-        updateURL(state);
-      }, URL_DEBOUNCE_MS),
+      debounce(
+        (
+          newN: number,
+          newT: number,
+          newTarget: '1e-4' | '1e-6' | '1e-8'
+        ) => {
+          const state: RunStateV1 = {
+            schema_version: 'run_state_v1',
+            app_version: APP_VERSION,
+            module: 'rys',
+            rys: { n: newN, T: newT, target: newTarget },
+            ui: { mode: 'explain' },
+          };
+          updateURL(state);
+        },
+        URL_DEBOUNCE_MS
+      ),
     []
   );
 
@@ -119,12 +128,12 @@ function ModuleB() {
   useEffect(() => {
     if (!urlInitialized) return;
 
-    debouncedUpdateURL(m, T, view);
+    debouncedUpdateURL(n, T, target);
 
     return () => {
       debouncedUpdateURL.cancel();
     };
-  }, [m, T, view, urlInitialized, debouncedUpdateURL]);
+  }, [n, T, target, urlInitialized, debouncedUpdateURL]);
 
   // Handle reset from invalid URL
   const handleReset = useCallback(() => {
@@ -143,34 +152,43 @@ function ModuleB() {
     const state: RunStateV1 = {
       schema_version: 'run_state_v1',
       app_version: APP_VERSION,
-      module: 'boys',
-      boys: { m, T, view },
+      module: 'rys',
+      rys: { n, T, target },
       ui: { mode },
     };
 
-    // Create BoysArtifactResult from compute result
-    const artifactResult: BoysArtifactResult = {
-      type: 'boys',
+    // Build error curve data if available
+    const errorCurveData =
+      errorCurve.status === 'success'
+        ? errorCurve.result.points.map((point) => ({
+            n: point.n,
+            max_error: point.maxError,
+          }))
+        : undefined;
+
+    // Create RysArtifactResult from compute result
+    const artifactResult: RysArtifactResult = {
+      type: 'rys',
       data: {
-        value: result.value,
-        method: result.method,
-        terms_count: result.termsCount,
-        estimated_error: result.estimatedError,
+        roots: result.roots,
+        weights: result.weights,
+        error_curve: errorCurveData,
+        reconstruction_error: 0, // Not computed in current implementation
       },
     };
 
     // Create and download the artifact
     const artifact = createArtifact(state, artifactResult);
     downloadArtifact(artifact);
-  }, [compute, m, T, view, mode]);
+  }, [compute, errorCurve, n, T, target, mode]);
 
   // Handle import of artifact
   const handleImport = useCallback((artifact: RunArtifactV1) => {
     // Check if artifact is for the correct module
     const artifactModule = getArtifactModule(artifact);
-    if (artifactModule !== 'boys') {
+    if (artifactModule !== 'rys') {
       console.warn(
-        `Artifact is for module '${artifactModule}', but you're on Module B (Boys). ` +
+        `Artifact is for module '${artifactModule}', but you're on Module B (Rys). ` +
         `Please navigate to the correct module to import this artifact.`
       );
       return;
@@ -219,11 +237,11 @@ function ModuleB() {
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-800 mb-2">
-            Module B: Boys Function Lab
+            Module B: Rys Quadrature Lab
           </h1>
           <p className="text-slate-600">
-            Interactive exploration of the Boys function <MathInline>F_m(T)</MathInline> with
-            regime-based evaluation strategies.
+            Interactive exploration of Rys quadrature roots and weights for
+            Gaussian integral evaluation.
           </p>
         </div>
         <div className="flex gap-2">
@@ -251,12 +269,12 @@ function ModuleB() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Controls panel */}
         <div className="lg:col-span-1">
-          <BoysControlsPanel disabled={!isReady} />
+          <RysControlsPanel disabled={!isReady} />
         </div>
 
         {/* Result display */}
         <div className="lg:col-span-2">
-          <BoysResultDisplay />
+          <RysResultDisplay />
         </div>
       </div>
 
@@ -267,96 +285,138 @@ function ModuleB() {
         </h2>
         <div className="text-slate-600 text-sm space-y-3">
           <p>
-            The Boys function is defined as:
+            Rys quadrature provides specialized Gaussian quadrature rules for
+            integrals involving the Rys weight function:
           </p>
-          <MathBlock label="Boys Function Definition">
-            {`F_m(T) = \\int_0^1 t^{2m} e^{-Tt^2} \\, dt`}
+          <MathBlock label="Rys Weight Function">
+            {`w_T(x) = x^{-1/2} e^{-Tx}, \\quad x \\in [0,1]`}
           </MathBlock>
-          <p>
-            This integral is fundamental to the evaluation of Gaussian integrals
-            in quantum chemistry. The parameter <MathInline>{`T = \\rho R_{PQ}^2`}</MathInline> measures
-            the effective squared distance between two Gaussian overlap distributions.
-          </p>
 
-          {/* 3 Theoretical Regimes */}
+          {/* Main Quadrature Formula */}
           <h3 className="font-semibold text-slate-700 mt-4 mb-2">
-            Three Computational Regimes (Theory)
+            Quadrature Approximation
           </h3>
           <p>
-            Different computational strategies are optimal depending on the value of <MathInline>T</MathInline>:
+            The quadrature rule approximates integrals with the Rys weight function:
           </p>
+          <MathBlock label="Quadrature Formula">
+            {`\\int_0^1 f(t^2) e^{-Tt^2} dt \\approx \\sum_{i=1}^{n} w_i f(t_i^2)`}
+          </MathBlock>
 
-          {/* Small T - Series */}
+          {/* Boys-to-Moments Correspondence */}
+          <h3 className="font-semibold text-slate-700 mt-4 mb-2">
+            Boys Functions as Moments
+          </h3>
+          <p>
+            The Boys function <Math>{'F_n(T)'}</Math> equals half the n-th moment of the Rys weight function:
+          </p>
           <div className="bg-blue-50 rounded-lg p-4 border border-blue-200 mt-3">
-            <h4 className="font-semibold text-blue-800 mb-2">
-              1. Small T (<MathInline>{`T < 25`}</MathInline>): Series Expansion
-            </h4>
-            <MathBlock className="!bg-white !border-blue-100 !my-2">
-              {`F_m(T) = \\sum_{k=0}^{\\infty} \\frac{(-T)^k}{k! \\cdot (2m+2k+1)}`}
-            </MathBlock>
+            <MathDisplay>
+              {`\\mu_k(T) = \\int_0^1 x^k w_T(x)\\, dx = \\mathbf{2F_k(T)}`}
+            </MathDisplay>
             <p className="text-blue-700 text-xs">
-              The Taylor series expansion converges rapidly for small <MathInline>T</MathInline>.
-              Truncating after ~15-25 terms typically achieves machine precision.
+              This correspondence is the foundation of Rys quadrature: computing Boys functions is equivalent to computing moments of <Math>{'w_T'}</Math>.
             </p>
           </div>
 
-          {/* Moderate T - erf + Recurrence */}
-          <div className="bg-green-50 rounded-lg p-4 border border-green-200 mt-3">
-            <h4 className="font-semibold text-green-800 mb-2">
-              2. Moderate T (<MathInline>{`25 \\leq T < 30+5m`}</MathInline>): erf + Upward Recurrence
-            </h4>
-            <MathBlock className="!bg-white !border-green-100 !my-2">
-              {`F_0(T) = \\frac{1}{2}\\sqrt{\\frac{\\pi}{T}} \\cdot \\text{erf}(\\sqrt{T})`}
-            </MathBlock>
-            <MathBlock className="!bg-white !border-green-100 !my-2">
-              {`F_{m+1}(T) = \\frac{(2m+1) \\cdot F_m(T) - e^{-T}}{2T}`}
-            </MathBlock>
+          {/* Hankel Matrix */}
+          <h3 className="font-semibold text-slate-700 mt-4 mb-2">
+            Hankel Matrix Structure
+          </h3>
+          <p>
+            The moments form a symmetric Hankel matrix <Math>{'H'}</Math> where <Math>{'H_{ij} = \\mu_{i+j}'}</Math>:
+          </p>
+          <div className="bg-white rounded-lg p-4 border border-slate-200 mt-2 overflow-x-auto">
+            <MathDisplay>
+              {`H = \\begin{pmatrix} \\mu_0 & \\mu_1 & \\mu_2 \\\\ \\mu_1 & \\mu_2 & \\mu_3 \\\\ \\mu_2 & \\mu_3 & \\mu_4 \\end{pmatrix}`}
+            </MathDisplay>
+            <p className="text-xs text-slate-500 mt-2 text-center">Example: 3x3 Hankel matrix for <Math>{'n_r = 3'}</Math></p>
+          </div>
+
+          {/* Algorithm 5.1 Pipeline */}
+          <h3 className="font-semibold text-slate-700 mt-4 mb-2">
+            Algorithm 5.1: Moments to Nodes/Weights
+          </h3>
+          <div className="bg-gradient-to-r from-blue-50 via-green-50 to-purple-50 rounded-lg p-4 border border-slate-200">
+            <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-medium">
+              <span className="bg-blue-100 text-blue-800 px-3 py-1.5 rounded-full border border-blue-200">
+                1. <Math>{'\\mu_k = 2F_k(T)'}</Math>
+              </span>
+              <span className="text-slate-400">then</span>
+              <span className="bg-blue-100 text-blue-800 px-3 py-1.5 rounded-full border border-blue-200">
+                2. <Math>{'H, H^{(1)}'}</Math>
+              </span>
+              <span className="text-slate-400">then</span>
+              <span className="bg-green-100 text-green-800 px-3 py-1.5 rounded-full border border-green-200">
+                3. <Math>{'H = LL^T'}</Math>
+              </span>
+              <span className="text-slate-400">then</span>
+              <span className="bg-green-100 text-green-800 px-3 py-1.5 rounded-full border border-green-200">
+                4. <Math>{'J = L^{-1} H^{(1)} L^{-T}'}</Math>
+              </span>
+              <span className="text-slate-400">then</span>
+              <span className="bg-purple-100 text-purple-800 px-3 py-1.5 rounded-full border border-purple-200">
+                5. Eigendecompose <Math>{'J'}</Math>
+              </span>
+              <span className="text-slate-400">then</span>
+              <span className="bg-purple-100 text-purple-800 px-3 py-1.5 rounded-full border border-purple-200">
+                6. Nodes/Weights
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 mt-3 text-center">
+              <Math>{'C = L^{-1}'}</Math> transforms monomials to orthonormal polynomials (Gram-Schmidt via Cholesky)
+            </p>
+          </div>
+
+          {/* Golub-Welsch Theorem */}
+          <h3 className="font-semibold text-slate-700 mt-4 mb-2">
+            Golub-Welsch Theorem
+          </h3>
+          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+            <MathDisplay>
+              {`t_i = \\text{eigenvalues of } J, \\quad w_i = \\mu_0 \\cdot (V_{0i})^2`}
+            </MathDisplay>
             <p className="text-green-700 text-xs">
-              For moderate <MathInline>T</MathInline>, compute <MathInline>{`F_0(T)`}</MathInline> via the error function,
-              then use upward recurrence. Cancellation is manageable in this regime.
+              <Math>{'V_{0i}'}</Math> is the first component of the normalized eigenvector for eigenvalue <Math>{'t_i'}</Math>.
+              The weights are always positive because <Math>{'\\mu_0 > 0'}</Math> and <Math>{'(V_{0i})^2 > 0'}</Math>.
             </p>
           </div>
 
-          {/* Large T - Asymptotic */}
-          <div className="bg-violet-50 rounded-lg p-4 border border-violet-200 mt-3">
-            <h4 className="font-semibold text-violet-800 mb-2">
-              3. Large T (<MathInline>{`T > 30+5m`}</MathInline>): Asymptotic Expansion
-            </h4>
-            <MathBlock className="!bg-white !border-violet-100 !my-2">
-              {`F_m(T) \\sim \\frac{(2m-1)!!}{2^{m+1}} \\sqrt{\\frac{\\pi}{T^{2m+1}}}`}
-            </MathBlock>
-            <p className="text-violet-700 text-xs">
-              For large <MathInline>T</MathInline>, the asymptotic expansion achieves machine precision.
-              The threshold <MathInline>{`30+5m`}</MathInline> depends on the order <MathInline>m</MathInline> (e.g., <MathInline>{`T>30`}</MathInline> for <MathInline>{`m=0`}</MathInline>, <MathInline>{`T>55`}</MathInline> for <MathInline>{`m=5`}</MathInline>).
+          {/* Root Count Rule */}
+          <h3 className="font-semibold text-slate-700 mt-4 mb-2">
+            Root Count Rule for ERIs
+          </h3>
+          <div className="bg-violet-50 rounded-lg p-4 border border-violet-200">
+            <MathDisplay>
+              {`n_r = \\left\\lfloor \\frac{L}{2} \\right\\rfloor + 1, \\quad \\text{where } L = l_a + l_b + l_c + l_d`}
+            </MathDisplay>
+            <p className="text-violet-700 text-xs mb-2">
+              For a shell quartet <Math>{'(l_a l_b | l_c l_d)'}</Math> with total angular momentum <Math>{'L'}</Math>, an <Math>{'n_r'}</Math>-point quadrature is exact for polynomials of degree <Math>{'\\leq 2n_r-1'}</Math>.
             </p>
-          </div>
-
-          {/* Implementation Note */}
-          <div className="bg-amber-50 rounded-lg p-4 border border-amber-200 mt-4">
-            <h4 className="font-semibold text-amber-800 mb-2">
-              Implementation (libcint-based)
-            </h4>
-            <p className="text-amber-700 text-sm">
-              The actual implementation uses <strong>2 methods</strong> with an
-              <MathInline>m</MathInline>-dependent turnover point optimized for double precision:
-            </p>
-            <ul className="list-disc list-inside space-y-1 ml-2 text-amber-700 text-sm mt-2">
-              <li>
-                <strong>Series:</strong> <MathInline>{`T < \\text{turnover}(m)`}</MathInline> with downward recurrence
-              </li>
-              <li>
-                <strong>Recurrence:</strong> <MathInline>{`T \\geq \\text{turnover}(m)`}</MathInline> using erf + upward recurrence
-                (combines moderate and large T regimes)
-              </li>
-            </ul>
-            <p className="text-amber-600 text-xs mt-2">
-              Turnover examples: <MathInline>{`m=0,1 \\to 0`}</MathInline> (always recurrence), <MathInline>{`m=5 \\to {\\sim}2.1`}</MathInline>, <MathInline>{`m=10 \\to {\\sim}4.05`}</MathInline>
-            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-violet-200">
+                    <th className="text-left py-1 px-2 text-violet-800">Shell Quartet</th>
+                    <th className="text-center py-1 px-2 text-violet-800"><Math>{'L'}</Math></th>
+                    <th className="text-center py-1 px-2 text-violet-800"><Math>{'n_r'}</Math></th>
+                    <th className="text-left py-1 px-2 text-violet-800">Boys orders</th>
+                  </tr>
+                </thead>
+                <tbody className="text-violet-700">
+                  <tr><td className="py-1 px-2"><Math>{'(ss|ss)'}</Math></td><td className="text-center py-1 px-2">0</td><td className="text-center py-1 px-2">1</td><td className="py-1 px-2"><Math>{'F_0'}</Math></td></tr>
+                  <tr><td className="py-1 px-2"><Math>{'(ps|ss)'}</Math></td><td className="text-center py-1 px-2">1</td><td className="text-center py-1 px-2">1</td><td className="py-1 px-2"><Math>{'F_0, F_1'}</Math></td></tr>
+                  <tr><td className="py-1 px-2"><Math>{'(pp|ss)'}</Math></td><td className="text-center py-1 px-2">2</td><td className="text-center py-1 px-2">2</td><td className="py-1 px-2"><Math>{'F_0 \\ldots F_3'}</Math></td></tr>
+                  <tr><td className="py-1 px-2"><Math>{'(pp|pp)'}</Math></td><td className="text-center py-1 px-2">4</td><td className="text-center py-1 px-2">3</td><td className="py-1 px-2"><Math>{'F_0 \\ldots F_5'}</Math></td></tr>
+                  <tr><td className="py-1 px-2"><Math>{'(dd|pp)'}</Math></td><td className="text-center py-1 px-2">6</td><td className="text-center py-1 px-2">4</td><td className="py-1 px-2"><Math>{'F_0 \\ldots F_7'}</Math></td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <p className="text-xs text-slate-500 mt-4">
-            Reference: Shavitt, I. (1963). <em>Methods in Computational Physics</em>, 2, 1-45.
-            See also lecture notes ch04_s06 for detailed regime analysis.
+            Reference: Dupuis, M., Rys, J., & King, H. F. (1976).{' '}
+            <em>J. Chem. Phys.</em>, 65, 111-116. See also lecture notes Chapter 5 for Algorithm 5.1.
           </p>
         </div>
       </div>

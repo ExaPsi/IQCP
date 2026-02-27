@@ -1,7 +1,7 @@
 /**
  * Boys Module State Store
  *
- * Zustand store managing the state for Module B (Boys Function Lab).
+ * Zustand store managing the state for Module A (Boys Function Lab).
  * Handles parameter inputs, computation status, and URL synchronization.
  *
  * @module stores/boysStore
@@ -115,7 +115,7 @@ const DEFAULT_STATE: BoysState = {
  * Boys function state store.
  *
  * Manages parameter inputs (m, T, view), computation status,
- * and URL synchronization for Module B.
+ * and URL synchronization for Module A.
  *
  * @example
  * ```typescript
