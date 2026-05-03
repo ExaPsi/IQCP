@@ -498,7 +498,7 @@ dependencies = [
 
 [[package]]
 name = "qc-core"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "approx",
  "criterion",
@@ -518,7 +518,7 @@ dependencies = [
 
 [[package]]
 name = "qc-io"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "approx",
  "serde",
@@ -528,7 +528,7 @@ dependencies = [
 
 [[package]]
 name = "qc-wasm"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "approx",
  "js-sys",
@@ -544,7 +544,7 @@ dependencies = [
 
 [[package]]
 name = "qc-wasm-spectra"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "approx",
  "js-sys",
