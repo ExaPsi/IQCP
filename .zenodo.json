@@ -1,5 +1,4 @@
 {
-  "doi": "10.5281/zenodo.18798310",
   "upload_type": "software",
   "title": "IQCP: Client-Side Quantum Chemistry from SCF to Vibrational Spectra via WebAssembly",
   "creators": [

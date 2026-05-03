@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 title: "IQCP: Client-Side Quantum Chemistry from SCF to Vibrational Spectra via WebAssembly"
-doi: "10.5281/zenodo.18798310"
+doi: "10.5281/zenodo.19996612"
 version: 2.0.0
 license: MIT
 type: software

@@ -4,7 +4,7 @@ A client-side quantum chemistry engine that compiles a Rust implementation of Ha
 
 [![Live Demo](https://img.shields.io/badge/demo-iqcp.dev-blue.svg)](https://iqcp.dev)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18798310.svg)](https://doi.org/10.5281/zenodo.18798310)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18798309.svg)](https://doi.org/10.5281/zenodo.18798309)
 
 **Live Site:** [https://iqcp.dev](https://iqcp.dev)
 
@@ -256,7 +256,7 @@ If you use IQCP in your research, please cite both the software (Zenodo) and the
              Vchirawongkwin, Viwat},
   year    = {2026},
   version = {2.0.0},
-  doi     = {10.5281/zenodo.18798310},
+  doi     = {10.5281/zenodo.19996612},
   url     = {https://github.com/ExaPsi/IQCP}
 }
 ```

@@ -6,8 +6,10 @@ documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Releases are archived on Zenodo at
-[https://doi.org/10.5281/zenodo.18798310](https://doi.org/10.5281/zenodo.18798310).
+Releases are archived on Zenodo. The concept DOI
+[10.5281/zenodo.18798309](https://doi.org/10.5281/zenodo.18798309) always
+resolves to the latest version; individual versions have their own DOIs
+(e.g. v2.0.0 → [10.5281/zenodo.19996612](https://doi.org/10.5281/zenodo.19996612)).
 
 ## [Unreleased]
 
