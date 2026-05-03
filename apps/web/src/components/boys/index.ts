@@ -8,3 +8,4 @@ export { BoysControlsPanel } from './BoysControlsPanel';
 export { BoysResultDisplay } from './BoysResultDisplay';
 export { BoysChart } from './BoysChart';
 export { BoysInternalsPanel } from './BoysInternalsPanel';
+export { BoysMultiOrderPanel } from './BoysMultiOrderPanel';

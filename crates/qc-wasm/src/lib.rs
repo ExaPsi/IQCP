@@ -104,6 +104,15 @@ pub use qc_core::scf::{
     ScfOutput,
 };
 
+// Re-export PES types for convenience
+pub use qc_core::scf::pes::{PesEquilibrium, PesPoint, PesScanResult};
+
+// Re-export optimizer types for convenience
+pub use qc_core::optimizer::{OptMethod, OptimizationConfig, OptimizationResult, OptimizationStep};
+
+// Re-export orbital types for convenience
+pub use qc_core::orbital::{MarchingCubesResult, MoGridResult, OrbitalError};
+
 // ============================================================================
 // Boys Function WASM Bindings
 // ============================================================================
@@ -227,7 +236,7 @@ pub fn boys_eval_many(m: u32, ts: Vec<f64>) -> Result<JsValue, JsError> {
 /// # Returns
 ///
 /// A JavaScript object containing:
-/// - `roots`: Array of quadrature roots in the interval (0, 1)
+/// - `roots`: Array of quadrature roots in the interval [0, 1)
 /// - `weights`: Array of corresponding weights (all positive)
 /// - `nroots`: Number of roots/weights
 /// - `t`: The argument parameter
@@ -434,6 +443,8 @@ pub struct ScfWasmMatrices {
     pub fock_matrix: Vec<f64>,
     /// Final density matrix D (row-major, nbf x nbf)
     pub density_matrix: Vec<f64>,
+    /// MO coefficient matrix C (row-major, nbf x nbf)
+    pub mo_coefficients: Vec<f64>,
 }
 
 /// WASM-friendly orbital energies struct.
@@ -567,6 +578,7 @@ pub fn scf_run(system_json: &str, options: JsValue) -> Result<JsValue, JsError> 
         diis_start: 2,
         damp: wasm_options.damp.unwrap_or(0.0), // Default: no damping
         damp_start: 5,                          // Apply damping for first 5 iterations (like PySCF)
+        level_shift: 0.0,                       // No level shift by default
     };
 
     // 5. Call qc_core::scf::rhf_scf
@@ -585,6 +597,7 @@ pub fn scf_run(system_json: &str, options: JsValue) -> Result<JsValue, JsError> 
             h_core: system.h_core.clone(),
             fock_matrix: output.fock_matrix.clone(),
             density_matrix: output.density_matrix.clone(),
+            mo_coefficients: output.mo_coefficients.clone(),
         });
 
         // Orbital energies from output
@@ -595,6 +608,446 @@ pub fn scf_run(system_json: &str, options: JsValue) -> Result<JsValue, JsError> 
     }
 
     // 8. Return as JsValue
+    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// KS-DFT SCF WASM Bindings (US-068)
+// ============================================================================
+
+/// Input options for KS-DFT SCF calculation.
+///
+/// # Fields
+///
+/// * `convergence_profile` - "loose" | "medium" | "tight"
+/// * `max_iterations` - Maximum number of SCF iterations
+/// * `use_diis` - Enable DIIS acceleration
+/// * `method` - DFT method: "lda" (Slater + VWN5)
+/// * `grid_quality` - Grid quality: "standard" (302-pt) or "fine" (590-pt)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct KsScfWasmInput {
+    /// Atoms as [[Z, x, y, z], ...]
+    pub atoms: Vec<[f64; 4]>,
+    /// Basis set name (e.g., "sto-3g")
+    pub basis_name: String,
+    /// DFT method: "lda"
+    pub method: String,
+    /// Convergence profile: "loose" | "medium" | "tight"
+    #[serde(default = "default_convergence")]
+    pub convergence_profile: String,
+    /// Maximum number of SCF iterations
+    #[serde(default = "default_max_iter")]
+    pub max_iterations: u32,
+    /// Enable DIIS acceleration
+    #[serde(default = "default_diis")]
+    pub use_diis: bool,
+    /// Grid quality: "standard" or "fine"
+    #[serde(default = "default_grid_quality")]
+    pub grid_quality: String,
+    /// Use spherical harmonic basis functions (5 d-orbitals vs 6 Cartesian)
+    #[serde(default)]
+    pub use_spherical: bool,
+}
+
+fn default_convergence() -> String {
+    "tight".to_string()
+}
+fn default_max_iter() -> u32 {
+    100
+}
+fn default_diis() -> bool {
+    true
+}
+fn default_grid_quality() -> String {
+    "standard".to_string()
+}
+
+/// KS-DFT SCF result for WASM.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct KsScfWasmResult {
+    /// Whether SCF converged
+    pub converged: bool,
+    /// Final total energy (electronic + nuclear) in Hartree
+    pub energy: f64,
+    /// Number of iterations performed
+    pub iterations: usize,
+    /// Exchange-correlation energy component (Hartree)
+    pub energy_xc: f64,
+    /// Coulomb energy component (Hartree)
+    pub energy_j: f64,
+    /// One-electron energy (Hartree)
+    pub energy_1e: f64,
+    /// Nuclear repulsion energy (Hartree)
+    pub energy_nuc: f64,
+    /// Method identifier
+    pub method: String,
+    /// Iteration-by-iteration trace
+    pub trace: Vec<ScfWasmIteration>,
+    /// Final density matrix (row-major, nbf x nbf)
+    pub density_matrix: Vec<f64>,
+    /// MO coefficients (column-major from nalgebra, nbf x nbf)
+    pub mo_coefficients: Vec<f64>,
+    /// Orbital energies (eigenvalues, sorted ascending)
+    pub orbital_energies: Vec<f64>,
+    /// Number of basis functions
+    pub n_basis: usize,
+    /// Number of occupied orbitals
+    pub n_occupied: usize,
+    /// Overlap matrix S (row-major, nbf x nbf) — needed for population analysis
+    pub overlap_matrix: Vec<f64>,
+    /// Core Hamiltonian matrix (row-major, nbf x nbf)
+    pub h_core: Vec<f64>,
+    /// Final Fock/KS matrix (row-major, nbf x nbf)
+    pub fock_matrix: Vec<f64>,
+    /// D3-BJ dispersion energy (Hartree), if applicable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub energy_disp: Option<f64>,
+}
+
+/// Run a Kohn-Sham DFT SCF calculation.
+///
+/// # Arguments
+///
+/// * `input` - JavaScript object containing `KsScfWasmInput`
+///
+/// # Returns
+///
+/// A JavaScript object containing `KsScfWasmResult`
+///
+/// # Example
+///
+/// ```javascript
+/// const input = {
+///   atoms: [[1, 0, 0, 0], [1, 0, 0, 1.4]],
+///   basisName: "sto-3g",
+///   method: "lda",
+///   convergenceProfile: "tight",
+///   useDiis: true,
+/// };
+/// const result = ks_scf(input);
+/// console.log(result.energy);
+/// ```
+#[wasm_bindgen]
+pub fn ks_scf(
+    input: JsValue,
+    progress_callback: Option<js_sys::Function>,
+) -> Result<JsValue, JsError> {
+    let wasm_input: KsScfWasmInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid KS-SCF input: {}", e)))?;
+
+    // 1. Build atoms and basis set
+    let atoms: Vec<qc_core::basis::Atom> = wasm_input
+        .atoms
+        .iter()
+        .map(|a| {
+            let z = a[0] as u8;
+            let pos = [a[1], a[2], a[3]];
+            qc_core::basis::Atom::new(z, pos)
+                .map_err(|e| JsError::new(&format!("Invalid atom: {}", e)))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let basis = qc_core::basis::BasisSet::build(atoms.clone(), &wasm_input.basis_name)
+        .map_err(|e| JsError::new(&format!("Basis set error: {}", e)))?;
+
+    // 2. Compute integrals (spherical or cartesian depending on user choice)
+    let use_spherical = wasm_input.use_spherical;
+    let nelec = basis.n_electrons;
+    let e_nuc = basis.nuclear_repulsion;
+
+    // Macro to emit integral-phase progress (distinguished from SCF progress by "phase" field).
+    // Uses a macro instead of a closure to avoid borrow conflicts with progress_callback.
+    macro_rules! emit_integral_progress {
+        ($step:expr, $pct:expr, $msg:expr) => {
+            if let Some(ref cb) = progress_callback {
+                let obj = js_sys::Object::new();
+                let _ = js_sys::Reflect::set(&obj, &"phase".into(), &"integrals".into());
+                let _ = js_sys::Reflect::set(&obj, &"step".into(), &JsValue::from_str($step));
+                let _ = js_sys::Reflect::set(&obj, &"percent".into(), &JsValue::from_f64($pct));
+                let _ = js_sys::Reflect::set(&obj, &"message".into(), &JsValue::from_str($msg));
+                let _ = cb.call1(&JsValue::NULL, &obj);
+            }
+        };
+    }
+
+    emit_integral_progress!("overlap", 5.0, "Computing overlap integrals (S)...");
+
+    let (s_matrix, h_core, eri, nbf) = if use_spherical {
+        let s = qc_core::integrals::overlap_matrix_spherical(&basis);
+        emit_integral_progress!("hcore", 15.0, "Computing core Hamiltonian (H)...");
+        let h = qc_core::integrals::hcore_matrix_spherical(&basis);
+        emit_integral_progress!(
+            "eri",
+            25.0,
+            "Computing electron repulsion integrals (ERI)..."
+        );
+        // Use progress variant: ERI is 25-95%, live per-quartet updates
+        let cb = progress_callback.clone();
+        let e =
+            qc_core::integrals::eri_compressed_spherical_with_progress(&basis, |done, total| {
+                if let Some(ref cb) = cb {
+                    let pct = 25.0 + (done as f64 / total as f64) * 70.0;
+                    let obj = js_sys::Object::new();
+                    let _ = js_sys::Reflect::set(&obj, &"phase".into(), &"integrals".into());
+                    let _ = js_sys::Reflect::set(&obj, &"step".into(), &JsValue::from_str("eri"));
+                    let _ = js_sys::Reflect::set(&obj, &"percent".into(), &JsValue::from_f64(pct));
+                    let msg = format!("ERI: {}/{} shell quartets ({:.0}%)", done, total, pct);
+                    let _ = js_sys::Reflect::set(&obj, &"message".into(), &JsValue::from_str(&msg));
+                    let _ = cb.call1(&JsValue::NULL, &obj);
+                }
+            });
+        let n = basis.n_basis_spherical();
+        (s, h, e, n)
+    } else {
+        let s = qc_core::integrals::overlap_matrix(&basis);
+        emit_integral_progress!("hcore", 15.0, "Computing core Hamiltonian (H)...");
+        let h = qc_core::integrals::hcore_matrix(&basis);
+        emit_integral_progress!(
+            "eri",
+            25.0,
+            "Computing electron repulsion integrals (ERI)..."
+        );
+        // Use progress variant: ERI is 25-95%, live per-quartet updates
+        let cb = progress_callback.clone();
+        let e = qc_core::integrals::eri_compressed_with_progress(&basis, |done, total| {
+            if let Some(ref cb) = cb {
+                let pct = 25.0 + (done as f64 / total as f64) * 70.0;
+                let obj = js_sys::Object::new();
+                let _ = js_sys::Reflect::set(&obj, &"phase".into(), &"integrals".into());
+                let _ = js_sys::Reflect::set(&obj, &"step".into(), &JsValue::from_str("eri"));
+                let _ = js_sys::Reflect::set(&obj, &"percent".into(), &JsValue::from_f64(pct));
+                let msg = format!("ERI: {}/{} shell quartets ({:.0}%)", done, total, pct);
+                let _ = js_sys::Reflect::set(&obj, &"message".into(), &JsValue::from_str(&msg));
+                let _ = cb.call1(&JsValue::NULL, &obj);
+            }
+        });
+        let n = basis.n_basis;
+        (s, h, e, n)
+    };
+
+    emit_integral_progress!("done", 95.0, "All integrals computed");
+
+    let system = qc_core::scf::PresetSystem {
+        system_id: "ks_scf_wasm".to_string(),
+        label: "KS-DFT WASM calculation".to_string(),
+        nbf,
+        nelec,
+        e_nuc,
+        s_matrix,
+        h_core,
+        eri_compressed: eri,
+    };
+
+    // 3. Determine method
+    let method_lower = wasm_input.method.to_lowercase();
+    let is_rhf = method_lower == "rhf" || method_lower == "hf";
+    let use_d3bj = method_lower == "b3lyp-d3bj";
+
+    // For RHF, skip grid and functional setup — use rhf_scf directly
+    if is_rhf {
+        let config = qc_core::scf::ScfConfig {
+            profile: parse_convergence_profile(&wasm_input.convergence_profile),
+            max_iterations: wasm_input.max_iterations as usize,
+            use_diis: wasm_input.use_diis,
+            ..Default::default()
+        };
+
+        // Create progress callback
+        let rust_callback = progress_callback.as_ref().map(|cb| {
+            move |iteration: usize,
+                  energy: f64,
+                  delta_e: f64,
+                  rms_density: f64,
+                  diis_applied: bool| {
+                let obj = js_sys::Object::new();
+                let _ = js_sys::Reflect::set(&obj, &"iteration".into(), &(iteration as f64).into());
+                let _ = js_sys::Reflect::set(&obj, &"energy".into(), &energy.into());
+                let _ = js_sys::Reflect::set(&obj, &"deltaE".into(), &delta_e.into());
+                let _ = js_sys::Reflect::set(&obj, &"rmsDensityChange".into(), &rms_density.into());
+                let _ = js_sys::Reflect::set(&obj, &"diisApplied".into(), &diis_applied.into());
+                let _ = cb.call1(&JsValue::NULL, &obj);
+            }
+        });
+
+        // Run RHF with progress callback via manual iteration tracking
+        let output = qc_core::scf::rhf_scf(&system, &config)
+            .map_err(|e| JsError::new(&format!("RHF SCF failed: {}", e)))?;
+
+        // Send final progress for each iteration (from trace)
+        if let Some(ref cb) = progress_callback {
+            for iter in &output.trace {
+                let obj = js_sys::Object::new();
+                let _ = js_sys::Reflect::set(
+                    &obj,
+                    &"iteration".into(),
+                    &(iter.iteration as f64).into(),
+                );
+                let _ = js_sys::Reflect::set(&obj, &"energy".into(), &iter.energy_total.into());
+                let _ = js_sys::Reflect::set(
+                    &obj,
+                    &"deltaE".into(),
+                    &iter.delta_e.unwrap_or(0.0).into(),
+                );
+                let _ = js_sys::Reflect::set(
+                    &obj,
+                    &"rmsDensityChange".into(),
+                    &iter.rms_density_change.unwrap_or(0.0).into(),
+                );
+                let _ =
+                    js_sys::Reflect::set(&obj, &"diisApplied".into(), &iter.diis_applied.into());
+                let _ = cb.call1(&JsValue::NULL, &obj);
+            }
+        }
+        let _ = rust_callback; // suppress unused warning
+
+        let n_occ = system.n_occ();
+        let result = KsScfWasmResult {
+            converged: output.converged,
+            energy: output.energy_total,
+            iterations: output.iterations,
+            energy_xc: 0.0,
+            energy_j: 0.0,
+            energy_1e: 0.0,
+            energy_nuc: system.e_nuc,
+            method: "RHF".to_string(),
+            trace: output.trace.iter().map(ScfWasmIteration::from).collect(),
+            density_matrix: output.density_matrix.clone(),
+            mo_coefficients: output.mo_coefficients.clone(),
+            orbital_energies: output.mo_energies.clone(),
+            n_basis: system.nbf,
+            n_occupied: n_occ,
+            overlap_matrix: system.s_matrix.clone(),
+            h_core: system.h_core.clone(),
+            fock_matrix: output.fock_matrix.clone(),
+            energy_disp: None,
+        };
+
+        return serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()));
+    }
+
+    // DFT path: build grid and select functional
+    emit_integral_progress!("grid", 50.0, "Building numerical integration grid...");
+    let grid_quality = match wasm_input.grid_quality.to_lowercase().as_str() {
+        "fine" => qc_core::dft::GridQuality::Fine,
+        _ => qc_core::dft::GridQuality::Standard,
+    };
+    let grid_config = qc_core::dft::GridConfig {
+        n_radial: 75,
+        quality: grid_quality,
+        pruning: true,
+    };
+    let grid = qc_core::dft::build_becke_grid(&atoms, &grid_config);
+
+    let functional: Box<dyn qc_core::dft::ExchangeCorrelation> = match method_lower.as_str() {
+        "lda" => Box::new(qc_core::dft::Lda::new()),
+        "b3lyp" | "b3lyp-d3bj" => Box::new(qc_core::dft::B3lyp::new()),
+        other => {
+            return Err(JsError::new(&format!(
+                "Unknown DFT method: '{}'. Supported: 'rhf', 'lda', 'b3lyp', 'b3lyp-d3bj'",
+                other
+            )))
+        }
+    };
+
+    // 5. Configure SCF
+    let config = qc_core::scf::ScfConfig {
+        profile: parse_convergence_profile(&wasm_input.convergence_profile),
+        max_iterations: wasm_input.max_iterations as usize,
+        use_diis: wasm_input.use_diis,
+        diis_size: 8,
+        diis_start: 2,
+        damp: 0.0,
+        damp_start: 5,
+        level_shift: 0.0,
+    };
+
+    // 6. Run KS-SCF with optional progress callback
+    let rust_callback = progress_callback.as_ref().map(|cb| {
+        let cb = cb.clone();
+        move |iteration: usize, energy: f64, delta_e: f64, rms_density: f64, diis_applied: bool| {
+            // Build a plain JS object for the progress data
+            let obj = js_sys::Object::new();
+            let _ = js_sys::Reflect::set(
+                &obj,
+                &"iteration".into(),
+                &JsValue::from_f64(iteration as f64),
+            );
+            let _ = js_sys::Reflect::set(&obj, &"energy".into(), &JsValue::from_f64(energy));
+            let _ = js_sys::Reflect::set(&obj, &"deltaE".into(), &JsValue::from_f64(delta_e));
+            let _ = js_sys::Reflect::set(
+                &obj,
+                &"rmsDensityChange".into(),
+                &JsValue::from_f64(rms_density),
+            );
+            let _ = js_sys::Reflect::set(
+                &obj,
+                &"diisApplied".into(),
+                &JsValue::from_bool(diis_applied),
+            );
+            let _ = cb.call1(&JsValue::NULL, &obj);
+        }
+    });
+    let mut output = qc_core::dft::ks_scf(
+        &system,
+        &config,
+        functional.as_ref(),
+        &grid,
+        &basis,
+        use_spherical,
+        rust_callback
+            .as_ref()
+            .map(|f| f as &dyn Fn(usize, f64, f64, f64, bool)),
+    )
+    .map_err(|e| JsError::new(&format!("KS-SCF failed: {}", e)))?;
+
+    // 6b. Apply D3-BJ dispersion correction if requested (post-SCF)
+    let energy_disp = if use_d3bj {
+        let d3_atoms: Vec<(u8, [f64; 3])> = wasm_input
+            .atoms
+            .iter()
+            .map(|a| (a[0] as u8, [a[1], a[2], a[3]]))
+            .collect();
+        let d3_result = qc_core::dft::compute_d3bj_energy(&d3_atoms, &qc_core::dft::D3BJ_B3LYP);
+        // Add dispersion energy to total
+        output.scf_output.energy_total += d3_result.energy;
+        output.scf_output.energy_electronic += d3_result.energy;
+        output.energy_disp = Some(d3_result.energy);
+        output.method = "B3LYP-D3(BJ)".to_string();
+        Some(d3_result.energy)
+    } else {
+        None
+    };
+
+    // 7. Build result
+    let n_occ = system.n_occ();
+    let result = KsScfWasmResult {
+        converged: output.scf_output.converged,
+        energy: output.scf_output.energy_total,
+        iterations: output.scf_output.iterations,
+        energy_xc: output.energy_xc,
+        energy_j: output.energy_j,
+        energy_1e: output.energy_1e,
+        energy_nuc: system.e_nuc,
+        method: output.method,
+        trace: output
+            .scf_output
+            .trace
+            .iter()
+            .map(ScfWasmIteration::from)
+            .collect(),
+        density_matrix: output.scf_output.density_matrix.clone(),
+        mo_coefficients: output.scf_output.mo_coefficients.clone(),
+        orbital_energies: output.scf_output.mo_energies.clone(),
+        n_basis: system.nbf,
+        n_occupied: n_occ,
+        overlap_matrix: system.s_matrix.clone(),
+        h_core: system.h_core.clone(),
+        fock_matrix: output.scf_output.fock_matrix.clone(),
+        energy_disp,
+    };
+
     serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
 }
 
@@ -610,29 +1063,21 @@ pub fn scf_run(system_json: &str, options: JsValue) -> Result<JsValue, JsError> 
 /// # Fields
 ///
 /// * `use_spherical` - If true, use spherical harmonic basis functions (5 d-orbitals).
-///                     If false (default), use Cartesian basis functions (6 d-orbitals).
-///                     For s and p orbitals, both choices give the same result.
+///   If false (default), use Cartesian basis functions (6 d-orbitals).
+///   For s and p orbitals, both choices give the same result.
 ///
 /// # Example
 ///
 /// ```javascript
 /// const options = { useSpherical: true };  // Use 5 d-orbitals instead of 6
 /// ```
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct IntegralComputeOptions {
     /// Use spherical harmonic basis functions (5 d-orbitals vs 6 Cartesian).
     /// Default: false (Cartesian basis for backward compatibility).
     #[serde(default)]
     pub use_spherical: bool,
-}
-
-impl Default for IntegralComputeOptions {
-    fn default() -> Self {
-        Self {
-            use_spherical: false, // Cartesian by default for backward compatibility
-        }
-    }
 }
 
 /// Input atom specification for integral computation.
@@ -848,11 +1293,11 @@ pub struct IntegralResult {
 #[wasm_bindgen]
 pub fn compute_integrals(geometry_json: &str, basis_name: &str) -> Result<JsValue, JsError> {
     use qc_core::basis::{symbol_to_atomic_number, Atom, BasisSet, ANGSTROM_TO_BOHR};
-    use qc_core::integrals::{hcore_matrix, overlap_matrix};
-    #[cfg(feature = "parallel")]
-    use qc_core::integrals::eri_compressed_parallel;
     #[cfg(not(feature = "parallel"))]
     use qc_core::integrals::eri_compressed;
+    #[cfg(feature = "parallel")]
+    use qc_core::integrals::eri_compressed_parallel;
+    use qc_core::integrals::{hcore_matrix, overlap_matrix};
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
@@ -870,7 +1315,7 @@ pub fn compute_integrals(geometry_json: &str, basis_name: &str) -> Result<JsValu
 
     // 3. Normalize basis name and validate
     let basis_lower = basis_name.to_lowercase();
-    let supported_bases = ["sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*"];
+    let supported_bases = ["sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"];
     if !supported_bases.contains(&basis_lower.as_str()) {
         return Err(JsError::new(&format!(
             "Unknown basis set '{}'. Supported: {}",
@@ -900,7 +1345,7 @@ pub fn compute_integrals(geometry_json: &str, basis_name: &str) -> Result<JsValu
         // Validate element symbol
         let atomic_number = symbol_to_atomic_number(&atom_input.symbol).map_err(|_| {
             JsError::new(&format!(
-                "Unsupported element '{}'. Only H-Ne are supported.",
+                "Unsupported element '{}'. Only H-Ar (Z=1-18) are supported.",
                 atom_input.symbol
             ))
         })?;
@@ -1008,7 +1453,7 @@ pub fn compute_integrals(geometry_json: &str, basis_name: &str) -> Result<JsValu
 /// # Arguments
 ///
 /// * `geometry_json` - JSON string containing GeometryInput
-/// * `basis_name` - Basis set name: "sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*"
+/// * `basis_name` - Basis set name: "sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"
 /// * `options` - Optional IntegralComputeOptions object
 ///
 /// # Options
@@ -1042,13 +1487,13 @@ pub fn compute_integrals_with_options(
     options: JsValue,
 ) -> Result<JsValue, JsError> {
     use qc_core::basis::{symbol_to_atomic_number, Atom, BasisSet, ANGSTROM_TO_BOHR};
+    #[cfg(not(feature = "parallel"))]
+    use qc_core::integrals::{eri_compressed, eri_compressed_spherical};
+    #[cfg(feature = "parallel")]
+    use qc_core::integrals::{eri_compressed_parallel, eri_compressed_spherical_parallel};
     use qc_core::integrals::{
         hcore_matrix, hcore_matrix_spherical, overlap_matrix, overlap_matrix_spherical,
     };
-    #[cfg(feature = "parallel")]
-    use qc_core::integrals::{eri_compressed_parallel, eri_compressed_spherical_parallel};
-    #[cfg(not(feature = "parallel"))]
-    use qc_core::integrals::{eri_compressed, eri_compressed_spherical};
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
@@ -1081,7 +1526,7 @@ pub fn compute_integrals_with_options(
 
     // 3. Normalize basis name and validate
     let basis_lower = basis_name.to_lowercase();
-    let supported_bases = ["sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*"];
+    let supported_bases = ["sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"];
     if !supported_bases.contains(&basis_lower.as_str()) {
         return Err(JsError::new(&format!(
             "Unknown basis set '{}'. Supported: {}",
@@ -1110,7 +1555,7 @@ pub fn compute_integrals_with_options(
     for atom_input in &geometry.atoms {
         let atomic_number = symbol_to_atomic_number(&atom_input.symbol).map_err(|_| {
             JsError::new(&format!(
-                "Unsupported element '{}'. Only H-Ne are supported.",
+                "Unsupported element '{}'. Only H-Ar (Z=1-18) are supported.",
                 atom_input.symbol
             ))
         })?;
@@ -1289,7 +1734,7 @@ fn generate_molecular_formula(symbols: &[&str]) -> String {
 /// # Arguments
 ///
 /// * `geometry_json` - JSON string containing GeometryInput
-/// * `basis_name` - Basis set name: "sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*"
+/// * `basis_name` - Basis set name: "sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"
 /// * `progress_callback` - Optional JavaScript callback function for progress updates
 ///
 /// # Progress Callback
@@ -1323,11 +1768,11 @@ pub fn compute_integrals_with_progress(
     progress_callback: Option<js_sys::Function>,
 ) -> Result<JsValue, JsError> {
     use qc_core::basis::{symbol_to_atomic_number, Atom, BasisSet, ANGSTROM_TO_BOHR};
-    use qc_core::integrals::{hcore_matrix, overlap_matrix};
     #[cfg(feature = "parallel")]
     use qc_core::integrals::eri_compressed_parallel;
     #[cfg(not(feature = "parallel"))]
     use qc_core::integrals::{eri_index, shell_eri};
+    use qc_core::integrals::{hcore_matrix, overlap_matrix};
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
@@ -1371,7 +1816,7 @@ pub fn compute_integrals_with_progress(
 
     // 3. Normalize basis name and validate
     let basis_lower = basis_name.to_lowercase();
-    let supported_bases = ["sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*"];
+    let supported_bases = ["sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"];
     if !supported_bases.contains(&basis_lower.as_str()) {
         return Err(JsError::new(&format!(
             "Unknown basis set '{}'. Supported: {}",
@@ -1400,7 +1845,7 @@ pub fn compute_integrals_with_progress(
     for atom_input in &geometry.atoms {
         let atomic_number = symbol_to_atomic_number(&atom_input.symbol).map_err(|_| {
             JsError::new(&format!(
-                "Unsupported element '{}'. Only H-Ne are supported.",
+                "Unsupported element '{}'. Only H-Ar (Z=1-18) are supported.",
                 atom_input.symbol
             ))
         })?;
@@ -1663,7 +2108,7 @@ pub fn compute_integrals_with_progress(
 /// # Arguments
 ///
 /// * `geometry_json` - JSON string containing GeometryInput
-/// * `basis_name` - Basis set name: "sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*"
+/// * `basis_name` - Basis set name: "sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"
 /// * `options` - JavaScript object with computation options (e.g., `{ useSpherical: true }`)
 /// * `progress_callback` - Optional JavaScript callback function for progress updates
 ///
@@ -1707,13 +2152,13 @@ pub fn compute_integrals_with_options_and_progress(
     progress_callback: Option<js_sys::Function>,
 ) -> Result<JsValue, JsError> {
     use qc_core::basis::{symbol_to_atomic_number, Atom, BasisSet, ANGSTROM_TO_BOHR};
-    use qc_core::integrals::{
-        hcore_matrix, hcore_matrix_spherical, overlap_matrix, overlap_matrix_spherical,
-    };
     #[cfg(feature = "parallel")]
     use qc_core::integrals::{eri_compressed_parallel, eri_compressed_spherical_parallel};
     #[cfg(not(feature = "parallel"))]
     use qc_core::integrals::{eri_compressed_spherical, eri_index, shell_eri};
+    use qc_core::integrals::{
+        hcore_matrix, hcore_matrix_spherical, overlap_matrix, overlap_matrix_spherical,
+    };
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
@@ -1772,7 +2217,7 @@ pub fn compute_integrals_with_options_and_progress(
 
     // 3. Normalize basis name and validate
     let basis_lower = basis_name.to_lowercase();
-    let supported_bases = ["sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*"];
+    let supported_bases = ["sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"];
     if !supported_bases.contains(&basis_lower.as_str()) {
         return Err(JsError::new(&format!(
             "Unknown basis set '{}'. Supported: {}",
@@ -1801,7 +2246,7 @@ pub fn compute_integrals_with_options_and_progress(
     for atom_input in &geometry.atoms {
         let atomic_number = symbol_to_atomic_number(&atom_input.symbol).map_err(|_| {
             JsError::new(&format!(
-                "Unsupported element '{}'. Only H-Ne are supported.",
+                "Unsupported element '{}'. Only H-Ar (Z=1-18) are supported.",
                 atom_input.symbol
             ))
         })?;
@@ -2105,6 +2550,1270 @@ pub struct TestResult {
     pub message: String,
 }
 
+// ============================================================================
+// PES Scan WASM Bindings (US-039)
+// ============================================================================
+
+/// WASM-friendly PES scan input struct.
+///
+/// This struct is deserialized from JavaScript to configure a PES bond-length
+/// scan. It uses camelCase field names to match JavaScript conventions.
+///
+/// # Fields
+///
+/// * `atom_a_z` - Atomic number of atom A (fixed at origin), 1-10
+/// * `atom_b_z` - Atomic number of atom B (translated along z-axis), 1-10
+/// * `r_min` - Minimum bond distance in bohr
+/// * `r_max` - Maximum bond distance in bohr
+/// * `n_points` - Number of scan points (evenly spaced)
+/// * `basis_name` - Basis set name (e.g., "sto-3g")
+/// * `options` - SCF computation options
+/// * `use_seeding` - Whether to seed convergence from previous point
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PesScanWasmInput {
+    /// Atomic number of atom A (fixed at origin)
+    pub atom_a_z: u8,
+    /// Atomic number of atom B (translated along z-axis)
+    pub atom_b_z: u8,
+    /// Minimum bond distance in bohr
+    pub r_min: f64,
+    /// Maximum bond distance in bohr
+    pub r_max: f64,
+    /// Number of scan points
+    pub n_points: usize,
+    /// Basis set name (e.g., "sto-3g")
+    pub basis_name: String,
+    /// SCF computation options
+    pub options: ScfWasmOptions,
+    /// Whether to use convergence seeding from previous point
+    #[serde(default = "default_use_seeding")]
+    pub use_seeding: bool,
+}
+
+fn default_use_seeding() -> bool {
+    true
+}
+
+/// WASM-friendly PES scan progress struct.
+///
+/// Serialized and passed to the JavaScript progress callback after each
+/// scan point completes.
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PesScanWasmProgress {
+    /// Index of the completed point (0-indexed)
+    pub point_index: usize,
+    /// Total number of scan points
+    pub total_points: usize,
+    /// Bond distance in bohr
+    pub r: f64,
+    /// SCF energy in Hartree
+    pub energy: f64,
+    /// Whether SCF converged at this point
+    pub converged: bool,
+}
+
+/// Run a bond-length PES scan for a diatomic molecule.
+///
+/// Scans the potential energy surface by varying the internuclear distance
+/// from `r_min` to `r_max` over `n_points` evenly spaced points. At each
+/// geometry, molecular integrals are computed on-the-fly and SCF is run.
+///
+/// The progress callback is called after each scan point with a
+/// `PesScanWasmProgress` object.
+///
+/// # Arguments
+///
+/// * `input` - JavaScript object containing `PesScanWasmInput` fields
+/// * `progress_callback` - JavaScript function called after each scan point
+///
+/// # Returns
+///
+/// A JavaScript object containing `PesScanResult`:
+/// - `points`: Array of { r, energy, converged, iterations }
+/// - `equilibrium`: { rBohr, energyHartree } or null
+/// - `computeTimeMs`: Total computation time
+/// - `totalIterations`: Sum of SCF iterations across all points
+///
+/// # Errors
+///
+/// Returns a `JsError` if:
+/// - Input deserialization fails
+/// - Atomic numbers are invalid (must be 1-10)
+/// - `r_min` >= `r_max`
+/// - `n_points` is 0
+///
+/// # Example
+///
+/// ```javascript
+/// import { pes_scan } from './qc_wasm.js';
+///
+/// const input = {
+///   atomAZ: 1, atomBZ: 1,
+///   rMin: 0.5, rMax: 5.0, nPoints: 20,
+///   basisName: "sto-3g",
+///   options: { convergenceProfile: "medium", maxIterations: 100, useDiis: true },
+///   useSeeding: true,
+/// };
+///
+/// const result = pes_scan(input, (progress) => {
+///   console.log(`Point ${progress.pointIndex}/${progress.totalPoints}: r=${progress.r}`);
+/// });
+/// ```
+#[wasm_bindgen]
+pub fn pes_scan(input: JsValue, progress_callback: &js_sys::Function) -> Result<JsValue, JsError> {
+    use qc_core::scf::pes;
+
+    // 1. Deserialize input
+    let wasm_input: PesScanWasmInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid PES scan input: {}", e)))?;
+
+    // 2. Validate input
+    if wasm_input.atom_a_z < 1 || wasm_input.atom_a_z > 10 {
+        return Err(JsError::new(&format!(
+            "pes_scan: atomAZ must be 1-10, got {}",
+            wasm_input.atom_a_z
+        )));
+    }
+    if wasm_input.atom_b_z < 1 || wasm_input.atom_b_z > 10 {
+        return Err(JsError::new(&format!(
+            "pes_scan: atomBZ must be 1-10, got {}",
+            wasm_input.atom_b_z
+        )));
+    }
+    if wasm_input.n_points == 0 {
+        return Err(JsError::new("pes_scan: nPoints must be > 0"));
+    }
+    if wasm_input.n_points > 1 && wasm_input.r_min >= wasm_input.r_max {
+        return Err(JsError::new(&format!(
+            "pes_scan: rMin ({}) must be < rMax ({})",
+            wasm_input.r_min, wasm_input.r_max
+        )));
+    }
+
+    // 3. Convert ScfWasmOptions to ScfConfig
+    let scf_config = ScfConfig {
+        profile: parse_convergence_profile(&wasm_input.options.convergence_profile),
+        max_iterations: wasm_input.options.max_iterations as usize,
+        use_diis: wasm_input.options.use_diis,
+        diis_size: wasm_input.options.diis_size.unwrap_or(6),
+        diis_start: 2,
+        damp: wasm_input.options.damp.unwrap_or(0.0),
+        damp_start: 5,
+        level_shift: 0.0,
+    };
+
+    // 4. Build PesScanConfig
+    let scan_config = pes::PesScanConfig {
+        atom_a_z: wasm_input.atom_a_z,
+        atom_b_z: wasm_input.atom_b_z,
+        r_min: wasm_input.r_min,
+        r_max: wasm_input.r_max,
+        n_points: wasm_input.n_points,
+        basis_name: &wasm_input.basis_name,
+        scf_config: &scf_config,
+        use_seeding: wasm_input.use_seeding,
+    };
+
+    // 5. Set up progress callback
+    let n_points = wasm_input.n_points;
+    let progress_fn = |idx: usize, r: f64, energy: f64, converged: bool| {
+        let progress = PesScanWasmProgress {
+            point_index: idx,
+            total_points: n_points,
+            r,
+            energy,
+            converged,
+        };
+        if let Ok(js_progress) = serde_wasm_bindgen::to_value(&progress) {
+            let _ = progress_callback.call1(&JsValue::NULL, &js_progress);
+        }
+    };
+
+    // 6. Run PES scan (timing via js_sys -- std::time::Instant not supported in WASM)
+    let start_ms = js_sys::Date::now();
+    let mut result = pes::pes_scan(&scan_config, Some(&progress_fn));
+    result.compute_time_ms = js_sys::Date::now() - start_ms;
+
+    // 7. Serialize and return result
+    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// Geometry Optimization WASM Bindings (US-074)
+// ============================================================================
+
+/// WASM-friendly geometry optimization input struct.
+///
+/// Contains the initial molecular geometry, optimization method, basis set,
+/// and convergence parameters needed to run L-BFGS geometry optimization.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct OptimizeWasmInput {
+    /// Atoms as [[Z, x, y, z], ...] where Z is atomic number and
+    /// x, y, z are coordinates in bohr
+    pub atoms: Vec<[f64; 4]>,
+    /// Basis set name (e.g., "sto-3g")
+    pub basis_name: String,
+    /// Electronic structure method: "rhf", "lda", or "b3lyp"
+    pub method: String,
+    /// Maximum optimization steps (default: 50)
+    #[serde(default = "default_max_steps")]
+    pub max_steps: usize,
+    /// Maximum gradient convergence threshold (Ha/bohr, default: 4.5e-4)
+    #[serde(default = "default_grad_threshold")]
+    pub grad_threshold: f64,
+    /// Energy convergence threshold (Ha, default: 1e-6)
+    #[serde(default = "default_energy_threshold")]
+    pub energy_threshold: f64,
+    /// L-BFGS memory size (default: 7)
+    #[serde(default = "default_memory_size")]
+    pub memory_size: usize,
+}
+
+fn default_max_steps() -> usize {
+    50
+}
+fn default_grad_threshold() -> f64 {
+    4.5e-4
+}
+fn default_energy_threshold() -> f64 {
+    1.0e-6
+}
+fn default_memory_size() -> usize {
+    7
+}
+
+/// Progress update emitted after each optimization step.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct OptimizeWasmProgress {
+    /// Current step number (0 = initial evaluation)
+    pub step: usize,
+    /// Total energy at this step (Ha)
+    pub energy: f64,
+    /// Maximum gradient component (Ha/bohr)
+    pub max_gradient: f64,
+    /// RMS gradient (Ha/bohr)
+    pub rms_gradient: f64,
+}
+
+/// Run L-BFGS geometry optimization.
+///
+/// Optimizes the molecular geometry to minimize the total energy using
+/// the L-BFGS quasi-Newton method. Supports RHF, LDA, and B3LYP methods.
+///
+/// # Arguments
+///
+/// * `input` - JavaScript object with optimization parameters
+/// * `progress_callback` - Called after each step with progress info
+///
+/// # Returns
+///
+/// An `OptimizationResult` object with the full trajectory, final geometry,
+/// and convergence status.
+///
+/// # Example
+///
+/// ```javascript
+/// import { optimize_geometry } from './qc_wasm.js';
+///
+/// const input = {
+///   atoms: [[1, 0, 0, 0], [1, 0, 0, 1.4]],
+///   basisName: "sto-3g",
+///   method: "rhf",
+///   maxSteps: 50,
+/// };
+///
+/// const result = optimize_geometry(input, (progress) => {
+///   console.log(`Step ${progress.step}: E=${progress.energy}, maxGrad=${progress.maxGradient}`);
+/// });
+/// ```
+#[wasm_bindgen]
+pub fn optimize_geometry(
+    input: JsValue,
+    progress_callback: &js_sys::Function,
+) -> Result<JsValue, JsError> {
+    use qc_core::optimizer;
+
+    // 1. Deserialize input
+    let wasm_input: OptimizeWasmInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid optimization input: {}", e)))?;
+
+    // 2. Validate input
+    if wasm_input.atoms.is_empty() {
+        return Err(JsError::new("optimize_geometry: atoms array is empty"));
+    }
+
+    // 3. Convert atoms from [Z, x, y, z] format
+    let atoms: Vec<(u8, [f64; 3])> = wasm_input
+        .atoms
+        .iter()
+        .map(|a| (a[0] as u8, [a[1], a[2], a[3]]))
+        .collect();
+
+    // 4. Parse method
+    let method = match wasm_input.method.to_lowercase().as_str() {
+        "rhf" | "hf" => optimizer::OptMethod::Rhf,
+        "lda" => optimizer::OptMethod::Lda,
+        "b3lyp" => optimizer::OptMethod::B3lyp,
+        other => {
+            return Err(JsError::new(&format!(
+                "optimize_geometry: unknown method '{}', expected 'rhf', 'lda', or 'b3lyp'",
+                other
+            )));
+        }
+    };
+
+    // 5. Build optimization config
+    let config = optimizer::OptimizationConfig {
+        max_steps: wasm_input.max_steps,
+        grad_threshold: wasm_input.grad_threshold,
+        energy_threshold: wasm_input.energy_threshold,
+        memory_size: wasm_input.memory_size,
+        method,
+        basis: wasm_input.basis_name,
+    };
+
+    // 6. Set up progress callback
+    let progress_fn = |step: &optimizer::OptimizationStep| {
+        let progress = OptimizeWasmProgress {
+            step: step.step,
+            energy: step.energy,
+            max_gradient: step.max_gradient,
+            rms_gradient: step.rms_gradient,
+        };
+        if let Ok(js_progress) = serde_wasm_bindgen::to_value(&progress) {
+            let _ = progress_callback.call1(&JsValue::NULL, &js_progress);
+        }
+    };
+
+    // 7. Run optimization (timing via js_sys)
+    let start_ms = js_sys::Date::now();
+    let mut result = optimizer::optimize_geometry(&atoms, &config, Some(&progress_fn));
+    result.compute_time_ms = js_sys::Date::now() - start_ms;
+
+    // 8. Serialize and return result
+    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// Population Analysis WASM Bindings (US-076)
+// ============================================================================
+
+/// WASM-friendly population analysis input struct.
+///
+/// Contains the density matrix, overlap matrix, and atom-to-basis mapping
+/// needed for Mulliken and Lowdin population analysis.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PopulationWasmInput {
+    /// Flattened density matrix (row-major, nbf x nbf)
+    pub density_matrix: Vec<f64>,
+    /// Flattened overlap matrix (row-major, nbf x nbf)
+    pub overlap_matrix: Vec<f64>,
+    /// Number of basis functions
+    pub nbf: usize,
+    /// Atom specifications: [{ atomicNumber, nBasis }, ...]
+    pub atoms: Vec<PopulationAtomInput>,
+}
+
+/// Single atom specification for population analysis.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PopulationAtomInput {
+    /// Atomic number (Z)
+    pub atomic_number: u8,
+    /// Number of basis functions on this atom
+    pub n_basis: usize,
+}
+
+/// Compute Mulliken and Lowdin population analysis.
+///
+/// Partitions the total electron density among atoms using two methods:
+///
+/// - **Mulliken** (1955): q_A = Z_A - sum_{mu in A} (DS)_{mu,mu}
+/// - **Lowdin** (1950): q_A = Z_A - sum_{mu in A} (S^{1/2} D S^{1/2})_{mu,mu}
+///
+/// # Arguments
+///
+/// * `input` - JavaScript object containing `PopulationWasmInput` fields:
+///   - `densityMatrix`: Flat density matrix (row-major, nbf x nbf)
+///   - `overlapMatrix`: Flat overlap matrix (row-major, nbf x nbf)
+///   - `nbf`: Number of basis functions
+///   - `atoms`: Array of { atomicNumber, nBasis } for each atom
+///
+/// # Returns
+///
+/// A JavaScript object containing:
+/// - `atoms`: Array of per-atom charges and populations
+/// - `totalMullikenCharge`: Sum of all Mulliken charges
+/// - `totalLowdinCharge`: Sum of all Lowdin charges
+/// - `computeTimeUs`: Computation time in microseconds
+///
+/// # Example
+///
+/// ```javascript
+/// import { compute_population } from './qc_wasm.js';
+///
+/// const result = compute_population({
+///   densityMatrix: [...],
+///   overlapMatrix: [...],
+///   nbf: 7,
+///   atoms: [
+///     { atomicNumber: 8, nBasis: 5 },
+///     { atomicNumber: 1, nBasis: 1 },
+///     { atomicNumber: 1, nBasis: 1 },
+///   ],
+/// });
+/// console.log(result.atoms[0].mullikenCharge); // -0.3657...
+/// ```
+#[wasm_bindgen]
+pub fn compute_population(input: JsValue) -> Result<JsValue, JsError> {
+    let wasm_input: PopulationWasmInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid population input: {}", e)))?;
+
+    // Convert atom input to (atomic_number, n_basis) tuples
+    let atoms: Vec<(u8, usize)> = wasm_input
+        .atoms
+        .iter()
+        .map(|a| (a.atomic_number, a.n_basis))
+        .collect();
+
+    let result = qc_core::population::population_analysis(
+        &wasm_input.density_matrix,
+        &wasm_input.overlap_matrix,
+        wasm_input.nbf,
+        &atoms,
+    )
+    .map_err(|e| JsError::new(&format!("Population analysis failed: {}", e)))?;
+
+    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// MO Grid Evaluation WASM Bindings (US-042)
+// ============================================================================
+
+/// WASM-friendly MO grid evaluation input struct.
+///
+/// Contains the MO coefficients, basis set specification, and grid parameters
+/// needed to evaluate a molecular orbital on a 3D grid.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MoGridWasmInput {
+    /// MO coefficient vector (one per basis function)
+    pub mo_coefficients: Vec<f64>,
+    /// Atom specifications: [[Z, x, y, z], ...]
+    pub atoms: Vec<[f64; 4]>,
+    /// Basis set name (e.g., "sto-3g")
+    pub basis_name: String,
+    /// Grid origin [x, y, z] in Bohr
+    pub grid_origin: [f64; 3],
+    /// Grid spacing in Bohr (uniform)
+    pub grid_spacing: f64,
+    /// Grid dimensions [nx, ny, nz]
+    pub grid_dims: [usize; 3],
+    /// Whether the MO coefficients are in the spherical harmonic basis.
+    /// When true, the coefficients are transformed from spherical to Cartesian
+    /// before grid evaluation (since the grid evaluator uses Cartesian GTOs).
+    /// This must match the `useSpherical` option used in the SCF calculation.
+    #[serde(default)]
+    pub use_spherical: bool,
+}
+
+/// Evaluate a molecular orbital on a 3D grid.
+///
+/// Computes psi_i(r) = sum_mu { C_{mu,i} * chi_mu(r) } on a uniform 3D grid,
+/// where chi_mu are contracted Gaussian basis functions.
+///
+/// The result contains the grid values and metadata including the approximate
+/// norm-squared integral and computation time.
+///
+/// # Arguments
+///
+/// * `input` - JavaScript object containing `MoGridWasmInput` fields:
+///   - `moCoefficients`: MO coefficient vector (one per basis function)
+///   - `atoms`: Array of [Z, x, y, z] for each atom (coordinates in Bohr)
+///   - `basisName`: Basis set name (e.g., "sto-3g")
+///   - `gridOrigin`: Grid origin [x, y, z] in Bohr
+///   - `gridSpacing`: Uniform grid spacing in Bohr
+///   - `gridDims`: Grid dimensions [nx, ny, nz]
+///   - `useSpherical`: (optional, default false) Whether the MO coefficients
+///     are in the spherical harmonic basis. When true, coefficients are
+///     transformed from spherical (5 d-functions) to Cartesian (6 d-functions)
+///     before grid evaluation.
+///
+/// # Returns
+///
+/// A JavaScript object containing `MoGridResult`:
+/// - `values`: Flat array of grid values (C-order: x-slowest, z-fastest)
+/// - `gridOrigin`: Grid origin
+/// - `gridSpacing`: Grid spacing
+/// - `gridDims`: Grid dimensions
+/// - `maxAbsValue`: Maximum absolute value in the grid
+/// - `normSqIntegral`: Approximate norm-squared integral
+/// - `computeTimeMs`: Computation time in milliseconds
+///
+/// # Errors
+///
+/// Returns a `JsError` if:
+/// - Input deserialization fails
+/// - Basis set name is invalid
+/// - MO coefficient count does not match basis size
+/// - Grid dimensions are invalid (< 2 in any direction)
+///
+/// # Example
+///
+/// ```javascript
+/// import { evaluate_mo_grid } from './qc_wasm.js';
+///
+/// const input = {
+///   moCoefficients: [0.549, 0.549],
+///   atoms: [[1, 0, 0, 0], [1, 0, 0, 1.4]],
+///   basisName: "sto-3g",
+///   gridOrigin: [-5, -5, -5],
+///   gridSpacing: 0.5,
+///   gridDims: [21, 21, 23],
+/// };
+///
+/// const result = evaluate_mo_grid(input);
+/// console.log(`Max value: ${result.maxAbsValue}`);
+/// console.log(`Norm^2: ${result.normSqIntegral}`);
+/// ```
+#[wasm_bindgen]
+pub fn evaluate_mo_grid(input: JsValue) -> Result<JsValue, JsError> {
+    use qc_core::basis::{Atom, BasisSet};
+    use qc_core::orbital;
+
+    // 1. Deserialize input
+    let wasm_input: MoGridWasmInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid MO grid input: {}", e)))?;
+
+    // 2. Validate input
+    if wasm_input.atoms.is_empty() {
+        return Err(JsError::new(
+            "evaluate_mo_grid: atoms array must not be empty",
+        ));
+    }
+    if wasm_input.grid_dims.iter().any(|&d| d < 2) {
+        return Err(JsError::new(
+            "evaluate_mo_grid: grid dimensions must be >= 2",
+        ));
+    }
+    if wasm_input.grid_spacing <= 0.0 {
+        return Err(JsError::new(&format!(
+            "evaluate_mo_grid: grid spacing must be positive, got {}",
+            wasm_input.grid_spacing
+        )));
+    }
+
+    // 3. Build basis set from atom specs
+    let atoms: Result<Vec<Atom>, _> = wasm_input
+        .atoms
+        .iter()
+        .map(|a| {
+            let z = a[0] as u8;
+            Atom::new(z, [a[1], a[2], a[3]])
+        })
+        .collect();
+    let atoms = atoms.map_err(|e| JsError::new(&format!("Invalid atom: {}", e)))?;
+    let basis = BasisSet::build(atoms, &wasm_input.basis_name)
+        .map_err(|e| JsError::new(&format!("Invalid basis set: {}", e)))?;
+
+    // 4. If MO coefficients are in spherical basis, transform to Cartesian.
+    //    The grid evaluator always uses Cartesian GTOs (6 d-functions), so
+    //    spherical MO coefficients (5 d-functions) must be expanded.
+    //    For s and p shells, spherical == Cartesian (no change).
+    //    For d shells: C_cart[mu] = sum_m CART2SPH_D[mu][m] * C_sph[m]
+    let mo_coefficients = if wasm_input.use_spherical && basis.has_spherical_difference() {
+        use qc_core::integrals::SphericalTransform;
+
+        let n_sph = basis.n_basis_spherical();
+        if wasm_input.mo_coefficients.len() != n_sph {
+            return Err(JsError::new(&format!(
+                "evaluate_mo_grid: MO coefficient count {} does not match spherical basis size {}",
+                wasm_input.mo_coefficients.len(),
+                n_sph
+            )));
+        }
+
+        // Transform shell-by-shell from spherical to Cartesian
+        let n_cart = basis.n_basis;
+        let mut cart_coeffs = Vec::with_capacity(n_cart);
+        let mut sph_offset = 0;
+
+        for shell in &basis.shells {
+            let l = shell.l_value();
+            let transform = SphericalTransform::new(l);
+            let n_s = transform.n_sph;
+            let n_c = transform.n_cart;
+
+            if transform.needs_transform() {
+                // d-shell (or higher): C_cart[c] = sum_m T[c][m] * C_sph[m]
+                for c in 0..n_c {
+                    let mut val = 0.0;
+                    for m in 0..n_s {
+                        val += transform.coeff(c, m) * wasm_input.mo_coefficients[sph_offset + m];
+                    }
+                    cart_coeffs.push(val);
+                }
+            } else {
+                // s/p shell: identity transformation, copy directly
+                for m in 0..n_s {
+                    cart_coeffs.push(wasm_input.mo_coefficients[sph_offset + m]);
+                }
+            }
+
+            sph_offset += n_s;
+        }
+
+        cart_coeffs
+    } else {
+        wasm_input.mo_coefficients
+    };
+
+    // 5. Evaluate MO on grid
+    let result = orbital::evaluate_mo_on_grid(
+        &mo_coefficients,
+        &basis,
+        wasm_input.grid_origin,
+        wasm_input.grid_spacing,
+        wasm_input.grid_dims,
+    )
+    .map_err(|e| JsError::new(&format!("MO grid evaluation failed: {}", e)))?;
+
+    // 6. Compute metadata
+    let dv = wasm_input.grid_spacing.powi(3);
+    let norm_sq_integral: f64 = result.iter().map(|v| v * v).sum::<f64>() * dv;
+    let max_abs_value = result.iter().map(|v| v.abs()).fold(0.0f64, f64::max);
+
+    let output = MoGridResult {
+        values: result,
+        grid_origin: wasm_input.grid_origin,
+        grid_spacing: wasm_input.grid_spacing,
+        grid_dims: wasm_input.grid_dims,
+        max_abs_value,
+        norm_sq_integral,
+        compute_time_ms: 0.0, // Cannot time in WASM without web_sys::Performance
+    };
+
+    // 7. Serialize and return
+    serde_wasm_bindgen::to_value(&output).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// Marching Cubes WASM Bindings
+// ============================================================================
+
+/// WASM input for marching cubes isosurface extraction.
+///
+/// Contains the scalar field grid data and extraction parameters.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MarchingCubesWasmInput {
+    /// Flat scalar field data (C-order: x-slowest, z-fastest)
+    pub grid_data: Vec<f64>,
+    /// Grid dimensions [nx, ny, nz]
+    pub grid_dims: [usize; 3],
+    /// Grid origin [x, y, z] in Bohr
+    pub grid_origin: [f64; 3],
+    /// Grid spacing in Bohr (uniform)
+    pub grid_spacing: f64,
+    /// Isovalue threshold
+    pub isovalue: f64,
+}
+
+/// Extract an isosurface from a 3D scalar field using marching cubes.
+///
+/// Returns `MarchingCubesResult` with vertices, indices, and smooth normals
+/// directly consumable by Three.js `BufferGeometry`.
+///
+/// Smooth vertex normals are computed via central-difference gradient estimation
+/// at each vertex position, with trilinear interpolation for non-grid-aligned
+/// positions.
+///
+/// Deterministic: same input always produces identical output.
+///
+/// # Arguments
+///
+/// * `input` - JavaScript object containing `MarchingCubesWasmInput` fields:
+///   - `gridData`: Flat scalar field values (C-order: x-slowest, z-fastest)
+///   - `gridDims`: Grid dimensions [nx, ny, nz]
+///   - `gridOrigin`: Grid origin [x, y, z] in Bohr
+///   - `gridSpacing`: Uniform grid spacing in Bohr
+///   - `isovalue`: Isosurface threshold value
+///
+/// # Returns
+///
+/// A JavaScript object containing `MarchingCubesResult`:
+/// - `vertices`: Interleaved vertex positions [x0,y0,z0, x1,y1,z1, ...]
+/// - `indices`: Triangle indices (3 per triangle)
+/// - `normals`: Interleaved vertex normals [nx0,ny0,nz0, ...]
+///
+/// # Errors
+///
+/// Returns a `JsError` if:
+/// - Input deserialization fails
+/// - Grid dimensions are invalid (< 2 in any direction)
+/// - Grid data length does not match dimensions
+///
+/// # Example
+///
+/// ```javascript
+/// import { marching_cubes } from './qc_wasm.js';
+///
+/// const input = {
+///   gridData: [...],       // flat scalar field
+///   gridDims: [50, 50, 50],
+///   gridOrigin: [-5, -5, -5],
+///   gridSpacing: 0.2,
+///   isovalue: 0.05,
+/// };
+///
+/// const result = marching_cubes(input);
+/// // result.vertices: Float32-like array [x0,y0,z0, ...]
+/// // result.indices: Uint32-like array [i0,i1,i2, ...]
+/// // result.normals: Float32-like array [nx0,ny0,nz0, ...]
+/// ```
+#[wasm_bindgen]
+pub fn marching_cubes(input: JsValue) -> Result<JsValue, JsError> {
+    use qc_core::orbital::marching_cubes as mc;
+
+    // 1. Deserialize input
+    let wasm_input: MarchingCubesWasmInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid marching cubes input: {}", e)))?;
+
+    // 2. Validate input
+    let [nx, ny, nz] = wasm_input.grid_dims;
+    if nx < 2 || ny < 2 || nz < 2 {
+        return Err(JsError::new(&format!(
+            "marching_cubes: grid dimensions must be >= 2, got [{}, {}, {}]",
+            nx, ny, nz
+        )));
+    }
+
+    let expected_len = nx * ny * nz;
+    if wasm_input.grid_data.len() != expected_len {
+        return Err(JsError::new(&format!(
+            "marching_cubes: grid data length {} does not match dims [{}, {}, {}] = {}",
+            wasm_input.grid_data.len(),
+            nx,
+            ny,
+            nz,
+            expected_len
+        )));
+    }
+
+    if wasm_input.grid_spacing <= 0.0 {
+        return Err(JsError::new(&format!(
+            "marching_cubes: grid spacing must be positive, got {}",
+            wasm_input.grid_spacing
+        )));
+    }
+
+    // 3. Run marching cubes
+    let result = mc::marching_cubes(
+        &wasm_input.grid_data,
+        wasm_input.grid_dims,
+        wasm_input.grid_origin,
+        wasm_input.grid_spacing,
+        wasm_input.isovalue,
+    );
+
+    // 4. Serialize and return
+    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// Extract dual isosurfaces (positive and negative lobes) for orbital visualization.
+///
+/// For orbital wavefunctions, positive and negative lobes require isosurfaces
+/// at `+isovalue` and `-isovalue`. This function extracts both in one call.
+///
+/// # Arguments
+///
+/// * `input` - Same as `marching_cubes` input (isovalue is the positive threshold)
+///
+/// # Returns
+///
+/// A JavaScript object with `positive` and `negative` fields, each containing
+/// a `MarchingCubesResult`.
+///
+/// # Example
+///
+/// ```javascript
+/// import { dual_marching_cubes } from './qc_wasm.js';
+///
+/// const result = dual_marching_cubes(input);
+/// // result.positive: MarchingCubesResult for +isovalue lobe
+/// // result.negative: MarchingCubesResult for -isovalue lobe
+/// ```
+#[wasm_bindgen]
+pub fn dual_marching_cubes(input: JsValue) -> Result<JsValue, JsError> {
+    use qc_core::orbital::marching_cubes as mc;
+
+    // 1. Deserialize input
+    let wasm_input: MarchingCubesWasmInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid marching cubes input: {}", e)))?;
+
+    // 2. Validate input
+    let [nx, ny, nz] = wasm_input.grid_dims;
+    if nx < 2 || ny < 2 || nz < 2 {
+        return Err(JsError::new(&format!(
+            "dual_marching_cubes: grid dimensions must be >= 2, got [{}, {}, {}]",
+            nx, ny, nz
+        )));
+    }
+
+    let expected_len = nx * ny * nz;
+    if wasm_input.grid_data.len() != expected_len {
+        return Err(JsError::new(&format!(
+            "dual_marching_cubes: grid data length {} does not match dims",
+            wasm_input.grid_data.len()
+        )));
+    }
+
+    if wasm_input.grid_spacing <= 0.0 {
+        return Err(JsError::new(&format!(
+            "dual_marching_cubes: grid spacing must be positive, got {}",
+            wasm_input.grid_spacing
+        )));
+    }
+
+    // 3. Run dual marching cubes
+    let (positive, negative) = mc::dual_marching_cubes(
+        &wasm_input.grid_data,
+        wasm_input.grid_dims,
+        wasm_input.grid_origin,
+        wasm_input.grid_spacing,
+        wasm_input.isovalue,
+    );
+
+    // 4. Serialize result
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct DualResult {
+        positive: mc::MarchingCubesResult,
+        negative: mc::MarchingCubesResult,
+    }
+
+    let result = DualResult { positive, negative };
+    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// Radial Profile WASM Bindings
+// ============================================================================
+
+/// Input for radial profile evaluation.
+///
+/// Specifies the element, basis set, and which shell to evaluate,
+/// along with optional grid parameters.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RadialProfileInput {
+    /// Atomic number (1-18)
+    atomic_number: u8,
+    /// Basis set name (e.g., "sto-3g", "6-31g*")
+    basis_name: String,
+    /// Shell index (0-indexed, matching order from get_basis_info)
+    shell_index: usize,
+    /// Number of evaluation points (default: 200)
+    n_points: Option<usize>,
+    /// Optional maximum r value in Bohr (auto-determined if absent)
+    r_max: Option<f64>,
+}
+
+/// Evaluate the radial profile of a contracted basis shell.
+///
+/// Computes the radial function R(r) = r^l * sum_k { d_k * exp(-alpha_k * r^2) }
+/// for a specified shell of a given element and basis set. Returns both the
+/// contracted profile and individual primitive profiles for overlay plotting.
+///
+/// # Arguments
+///
+/// * `input` - JavaScript object with fields:
+///   - `atomicNumber`: Atomic number (1-18)
+///   - `basisName`: Basis set name (e.g., "sto-3g")
+///   - `shellIndex`: Which shell to evaluate (0-indexed)
+///   - `nPoints`: Optional number of grid points (default: 200)
+///   - `rMax`: Optional maximum r in Bohr (auto if absent)
+///
+/// # Returns
+///
+/// A `RadialProfileResult` object containing:
+/// - `rValues`: Array of r values in Bohr
+/// - `contractedValues`: The contracted radial profile
+/// - `primitiveValues`: Per-primitive profiles (2D array)
+/// - `exponents`, `effectiveCoefficients`, `rawCoefficients`: Shell data
+/// - `angularMomentum`, `angularMomentumLabel`: Shell type info
+/// - `nPrimitives`, `rMax`: Metadata
+///
+/// # Errors
+///
+/// Returns `JsError` if:
+/// - The atomic number or basis set is not supported
+/// - The shell index is out of range
+///
+/// # Example
+///
+/// ```javascript
+/// import { evaluate_radial_profile } from './qc_wasm.js';
+///
+/// const result = evaluate_radial_profile({
+///   atomicNumber: 1,
+///   basisName: "sto-3g",
+///   shellIndex: 0,
+///   nPoints: 200,
+/// });
+/// console.log(result.contractedValues); // [0.628..., ...]
+/// ```
+#[wasm_bindgen]
+pub fn evaluate_radial_profile(input: JsValue) -> Result<JsValue, JsError> {
+    use qc_core::basis::{get_element_basis, AngularMomentum};
+
+    // 1. Deserialize input
+    let params: RadialProfileInput =
+        serde_wasm_bindgen::from_value(input).map_err(|e| JsError::new(&e.to_string()))?;
+
+    // 2. Get basis data for the element
+    let shells = get_element_basis(params.atomic_number, &params.basis_name)
+        .map_err(|e| JsError::new(&e.to_string()))?;
+
+    // 3. Validate shell index
+    if params.shell_index >= shells.len() {
+        return Err(JsError::new(&format!(
+            "Shell index {} out of range (element Z={} in {} has {} shells)",
+            params.shell_index,
+            params.atomic_number,
+            params.basis_name,
+            shells.len()
+        )));
+    }
+
+    // 4. Extract shell data
+    let (am, primitives_data) = &shells[params.shell_index];
+    let angular_momentum = match am {
+        AngularMomentum::S => 0,
+        AngularMomentum::P => 1,
+        AngularMomentum::D => 2,
+    };
+    let exponents: Vec<f64> = primitives_data.iter().map(|(e, _)| *e).collect();
+    let coefficients: Vec<f64> = primitives_data.iter().map(|(_, c)| *c).collect();
+
+    // 5. Call core evaluator
+    let result = qc_core::basis::evaluate_radial_profile(
+        angular_momentum,
+        &exponents,
+        &coefficients,
+        params.n_points,
+        params.r_max,
+    );
+
+    // 6. Serialize result
+    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// Overlap vs. Distance WASM Bindings
+// ============================================================================
+
+/// Input for overlap vs. distance computation.
+///
+/// Specifies two shells (by element, basis, and shell index) and a distance
+/// range over which to evaluate the overlap integral.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OverlapDistanceInput {
+    /// Atomic number for atom A (1-18)
+    element_a: u8,
+    /// Basis set name for atom A (e.g., "sto-3g")
+    basis_a: String,
+    /// Shell index within atom A's basis (0-indexed)
+    shell_index_a: usize,
+    /// Atomic number for atom B (1-18)
+    element_b: u8,
+    /// Basis set name for atom B (e.g., "sto-3g")
+    basis_b: String,
+    /// Shell index within atom B's basis (0-indexed)
+    shell_index_b: usize,
+    /// Minimum distance in bohr
+    r_min: f64,
+    /// Maximum distance in bohr
+    r_max: f64,
+    /// Number of evenly-spaced distance points
+    n_points: usize,
+}
+
+/// Result from overlap vs. distance computation.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OverlapDistanceOutput {
+    /// Distance values (bohr)
+    r_values: Vec<f64>,
+    /// Overlap integral values S_ab at each distance
+    overlap_values: Vec<f64>,
+    /// Display label for shell A (e.g., "H 1s")
+    shell_label_a: String,
+    /// Display label for shell B (e.g., "He 1s")
+    shell_label_b: String,
+    /// Basis set name for A
+    basis_a: String,
+    /// Basis set name for B
+    basis_b: String,
+}
+
+/// Compute overlap integral vs. interatomic distance for two basis shells.
+///
+/// Places shell A at the origin and shell B at (0, 0, R) for each R in the
+/// distance grid, computing the overlap integral at each point. This powers
+/// the Module D "Overlap vs. Distance" plot.
+///
+/// # Arguments
+///
+/// * `input` - JavaScript object with fields:
+///   - `elementA`: Atomic number for atom A (1-18)
+///   - `basisA`: Basis set name for atom A
+///   - `shellIndexA`: Shell index within atom A's basis
+///   - `elementB`: Atomic number for atom B (1-18)
+///   - `basisB`: Basis set name for atom B
+///   - `shellIndexB`: Shell index within atom B's basis
+///   - `rMin`: Minimum distance in bohr
+///   - `rMax`: Maximum distance in bohr
+///   - `nPoints`: Number of evenly-spaced distance points
+///
+/// # Returns
+///
+/// A JavaScript object with:
+/// - `rValues`: Array of distance values (bohr)
+/// - `overlapValues`: Array of overlap integral values
+/// - `shellLabelA`: Display label for shell A (e.g., "H 1s")
+/// - `shellLabelB`: Display label for shell B (e.g., "He 1s")
+/// - `basisA`: Basis set name for A
+/// - `basisB`: Basis set name for B
+///
+/// # Errors
+///
+/// Returns `JsError` if:
+/// - An atomic number or basis set is not supported
+/// - A shell index is out of range
+/// - `rMin >= rMax`
+/// - `nPoints` is 0
+///
+/// # Example
+///
+/// ```javascript
+/// import { overlap_vs_distance } from './qc_wasm.js';
+///
+/// const result = overlap_vs_distance({
+///   elementA: 1, basisA: "sto-3g", shellIndexA: 0,
+///   elementB: 1, basisB: "sto-3g", shellIndexB: 0,
+///   rMin: 0.1, rMax: 10.0, nPoints: 100,
+/// });
+/// console.log(result.overlapValues); // [0.98..., 0.94..., ...]
+/// ```
+#[wasm_bindgen]
+pub fn overlap_vs_distance(input: JsValue) -> Result<JsValue, JsError> {
+    use qc_core::basis::{
+        atomic_number_to_symbol, get_element_basis, AngularMomentum, ContractedShell,
+        GaussianPrimitive,
+    };
+    use qc_core::integrals::evaluate_overlap_vs_distance;
+
+    // 1. Deserialize input
+    let params: OverlapDistanceInput =
+        serde_wasm_bindgen::from_value(input).map_err(|e| JsError::new(&e.to_string()))?;
+
+    // 2. Validate distance range
+    if params.r_min >= params.r_max {
+        return Err(JsError::new(&format!(
+            "r_min ({}) must be less than r_max ({})",
+            params.r_min, params.r_max
+        )));
+    }
+    if params.n_points == 0 {
+        return Err(JsError::new("n_points must be at least 1"));
+    }
+
+    // 3. Get basis data and construct ContractedShell for shell A
+    let shells_a = get_element_basis(params.element_a, &params.basis_a)
+        .map_err(|e| JsError::new(&e.to_string()))?;
+    if params.shell_index_a >= shells_a.len() {
+        return Err(JsError::new(&format!(
+            "Shell index {} out of range for element Z={} in {} ({} shells)",
+            params.shell_index_a,
+            params.element_a,
+            params.basis_a,
+            shells_a.len()
+        )));
+    }
+    let (am_a, prims_a) = &shells_a[params.shell_index_a];
+    let shell_a = ContractedShell::new(
+        *am_a,
+        prims_a
+            .iter()
+            .map(|(e, c)| GaussianPrimitive::new(*e, *c))
+            .collect(),
+        [0.0, 0.0, 0.0],
+        0,
+    );
+
+    // 4. Get basis data and construct ContractedShell for shell B
+    let shells_b = get_element_basis(params.element_b, &params.basis_b)
+        .map_err(|e| JsError::new(&e.to_string()))?;
+    if params.shell_index_b >= shells_b.len() {
+        return Err(JsError::new(&format!(
+            "Shell index {} out of range for element Z={} in {} ({} shells)",
+            params.shell_index_b,
+            params.element_b,
+            params.basis_b,
+            shells_b.len()
+        )));
+    }
+    let (am_b, prims_b) = &shells_b[params.shell_index_b];
+    let shell_b = ContractedShell::new(
+        *am_b,
+        prims_b
+            .iter()
+            .map(|(e, c)| GaussianPrimitive::new(*e, *c))
+            .collect(),
+        [0.0, 0.0, 0.0],
+        0,
+    );
+
+    // 5. Generate uniform distance grid
+    let r_values: Vec<f64> = if params.n_points == 1 {
+        vec![params.r_min]
+    } else {
+        let step = (params.r_max - params.r_min) / (params.n_points - 1) as f64;
+        (0..params.n_points)
+            .map(|i| params.r_min + i as f64 * step)
+            .collect()
+    };
+
+    // 6. Compute overlap at each distance
+    let overlap_values = evaluate_overlap_vs_distance(&shell_a, &shell_b, &r_values);
+
+    // 7. Build display labels
+    let sym_a =
+        atomic_number_to_symbol(params.element_a).map_err(|e| JsError::new(&e.to_string()))?;
+    let sym_b =
+        atomic_number_to_symbol(params.element_b).map_err(|e| JsError::new(&e.to_string()))?;
+    let am_label = |am: &AngularMomentum| -> &str {
+        match am {
+            AngularMomentum::S => "s",
+            AngularMomentum::P => "p",
+            AngularMomentum::D => "d",
+        }
+    };
+    let shell_label_a = format!("{} {}", sym_a, am_label(am_a));
+    let shell_label_b = format!("{} {}", sym_b, am_label(am_b));
+
+    // 8. Build and serialize result
+    let result = OverlapDistanceOutput {
+        r_values,
+        overlap_values,
+        shell_label_a,
+        shell_label_b,
+        basis_a: params.basis_a,
+        basis_b: params.basis_b,
+    };
+
+    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// Basis Set Info WASM Bindings
+// ============================================================================
+
+/// Shell information for the Basis Explorer UI.
+///
+/// This struct provides a serializable representation of basis set shell data
+/// that can be consumed by the TypeScript frontend.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BasisShellInfo {
+    /// Angular momentum quantum number: 0=s, 1=p, 2=d
+    angular_momentum: u32,
+    /// Angular momentum letter: "s", "p", or "d"
+    angular_momentum_label: String,
+    /// Number of primitive Gaussian functions in this shell
+    n_primitives: usize,
+    /// Exponents of the primitive Gaussians
+    exponents: Vec<f64>,
+    /// Contraction coefficients of the primitive Gaussians
+    coefficients: Vec<f64>,
+}
+
+/// Get basis set shell information for a given element and basis set.
+///
+/// Returns an array of shell descriptors containing angular momentum type,
+/// number of primitives, exponents, and contraction coefficients. This data
+/// is sourced directly from the built-in basis set data in `qc-core`, ensuring
+/// a single source of truth.
+///
+/// # Arguments
+///
+/// * `atomic_number` - Atomic number of the element (1-18, H through Ar)
+/// * `basis_name` - Basis set name (e.g., "sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz")
+///
+/// # Returns
+///
+/// A JavaScript array of `BasisShellInfo` objects, each containing:
+/// - `angularMomentum`: Angular momentum quantum number (0, 1, or 2)
+/// - `angularMomentumLabel`: Human-readable label ("s", "p", or "d")
+/// - `nPrimitives`: Number of primitive Gaussians
+/// - `exponents`: Array of exponent values
+/// - `coefficients`: Array of contraction coefficients
+///
+/// # Errors
+///
+/// Returns a `JsError` if:
+/// - The atomic number is not supported (must be 1-18)
+/// - The basis set name is not recognized
+/// - The element/basis combination is not available
+///
+/// # Example
+///
+/// ```javascript
+/// import { get_basis_info } from './qc_wasm.js';
+///
+/// const shells = get_basis_info(1, "sto-3g");
+/// console.log(shells);
+/// // [{ angularMomentum: 0, angularMomentumLabel: "s", nPrimitives: 3,
+/// //    exponents: [3.42525091, 0.62353064, 0.16885540],
+/// //    coefficients: [0.15432897, 0.53532814, 0.44463454] }]
+/// ```
+#[wasm_bindgen]
+pub fn get_basis_info(atomic_number: u8, basis_name: &str) -> Result<JsValue, JsError> {
+    use qc_core::basis::{get_element_basis, AngularMomentum};
+
+    let shells =
+        get_element_basis(atomic_number, basis_name).map_err(|e| JsError::new(&e.to_string()))?;
+
+    let shell_infos: Vec<BasisShellInfo> = shells
+        .iter()
+        .map(|(am, prims)| BasisShellInfo {
+            angular_momentum: match am {
+                AngularMomentum::S => 0,
+                AngularMomentum::P => 1,
+                AngularMomentum::D => 2,
+            },
+            angular_momentum_label: match am {
+                AngularMomentum::S => "s".to_string(),
+                AngularMomentum::P => "p".to_string(),
+                AngularMomentum::D => "d".to_string(),
+            },
+            n_primitives: prims.len(),
+            exponents: prims.iter().map(|(e, _)| *e).collect(),
+            coefficients: prims.iter().map(|(_, c)| *c).collect(),
+        })
+        .collect();
+
+    serde_wasm_bindgen::to_value(&shell_infos).map_err(|e| JsError::new(&e.to_string()))
+}
+
 /// Returns the library version.
 ///
 /// This is useful for verifying the WASM module loaded correctly
@@ -2173,6 +3882,1661 @@ pub fn init() {
         // Future: console_error_panic_hook::set_once();
     }
 }
+
+// ============================================================================
+// Integral Matrices WASM Binding (US-055)
+// ============================================================================
+
+/// Input for computing one-electron integral matrices.
+///
+/// Specifies a molecular geometry, basis set, and optional spherical harmonic
+/// flag. Used by Module E (Integral Inspector) to compute S, T, V, H^core
+/// matrices for heatmap visualization.
+///
+/// # Fields
+///
+/// * `atoms` - Atom specifications with element symbols and coordinates
+/// * `units` - Coordinate units: "bohr" or "angstrom" (default: "bohr")
+/// * `basis_name` - Basis set name: "sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"
+/// * `use_spherical` - If true, use spherical harmonic d-orbitals (5 instead of 6)
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct IntegralMatricesInput {
+    /// List of atoms in the molecule
+    atoms: Vec<AtomInput>,
+    /// Basis set name (e.g., "sto-3g")
+    basis_name: String,
+    /// Coordinate units: "bohr" or "angstrom" (default: "bohr")
+    #[serde(default = "default_units")]
+    units: String,
+    /// Use spherical harmonic basis functions (default: false)
+    #[serde(default)]
+    use_spherical: bool,
+}
+
+fn default_units() -> String {
+    "bohr".to_string()
+}
+
+/// Result of computing one-electron integral matrices.
+///
+/// Contains S, T, V, and H^core matrices as flat row-major arrays,
+/// along with basis function labels and metadata.
+///
+/// # Layout
+///
+/// All matrices are stored in row-major order as flat Vec<f64> of length nbf*nbf.
+/// To access element (i, j): `matrix[i * nbf + j]`
+///
+/// # Labels
+///
+/// Basis function labels follow the convention "AtomSymbol ShellType":
+/// e.g., "O 1s", "O 2s", "O 2px", "H1 1s".
+/// When multiple atoms of the same element exist, they are numbered:
+/// "H1 1s", "H2 1s".
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct IntegralMatricesOutput {
+    /// Number of basis functions
+    nbf: usize,
+    /// Basis function labels: ["O 1s", "O 2s", "O 2px", ...]
+    labels: Vec<String>,
+    /// Overlap matrix S (row-major, nbf x nbf)
+    s_matrix: Vec<f64>,
+    /// Kinetic energy matrix T (row-major, nbf x nbf)
+    t_matrix: Vec<f64>,
+    /// Nuclear attraction matrix V (row-major, nbf x nbf)
+    v_matrix: Vec<f64>,
+    /// Core Hamiltonian H^core = T + V (row-major, nbf x nbf)
+    h_core: Vec<f64>,
+    /// Nuclear repulsion energy (Hartree)
+    nuclear_repulsion: f64,
+    /// Computation time in milliseconds
+    compute_time_ms: f64,
+}
+
+/// Compute one-electron integral matrices (S, T, V, H^core) for a molecule.
+///
+/// This function is designed for Module E (Integral Inspector), which displays
+/// individual integral matrices as heatmaps. Unlike `compute_integrals`, it
+/// returns T and V separately (not just their sum H^core) and does not compute
+/// two-electron integrals (ERIs), making it faster for this use case.
+///
+/// # Arguments
+///
+/// * `input` - JavaScript object with `atoms`, `basisName`, `units`, and `useSpherical` fields
+///
+/// # Returns
+///
+/// A JavaScript object containing:
+/// - `nbf`: Number of basis functions
+/// - `labels`: Array of basis function labels
+/// - `sMatrix`: Overlap matrix (row-major flat array)
+/// - `tMatrix`: Kinetic energy matrix (row-major flat array)
+/// - `vMatrix`: Nuclear attraction matrix (row-major flat array)
+/// - `hCore`: Core Hamiltonian T+V (row-major flat array)
+/// - `nuclearRepulsion`: Nuclear repulsion energy in Hartree
+/// - `computeTimeMs`: Computation time in milliseconds
+///
+/// # Errors
+///
+/// Returns JsError for invalid element symbols, unsupported basis sets,
+/// empty geometry, or invalid coordinate units.
+///
+/// # Example
+///
+/// ```javascript
+/// import { compute_integral_matrices } from './qc_wasm.js';
+///
+/// const result = compute_integral_matrices({
+///   atoms: [
+///     { symbol: "H", xyz: [0, 0, 0] },
+///     { symbol: "H", xyz: [0, 0, 1.3984] }
+///   ],
+///   basisName: "sto-3g",
+///   units: "bohr",
+/// });
+///
+/// console.log(result.nbf);     // 2
+/// console.log(result.labels);  // ["H1 1s", "H2 1s"]
+/// console.log(result.sMatrix); // [1.0, 0.659..., 0.659..., 1.0]
+/// ```
+#[wasm_bindgen]
+pub fn compute_integral_matrices(input: JsValue) -> Result<JsValue, JsError> {
+    use qc_core::basis::{symbol_to_atomic_number, Atom, BasisSet, ANGSTROM_TO_BOHR};
+    use qc_core::integrals::{
+        hcore_matrix, hcore_matrix_spherical, kinetic_matrix, kinetic_matrix_spherical,
+        nuclear_matrix, nuclear_matrix_spherical, overlap_matrix, overlap_matrix_spherical,
+    };
+
+    let start_time = js_sys::Date::now();
+
+    // 1. Deserialize input
+    let input: IntegralMatricesInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid input: {}", e)))?;
+
+    // 2. Validate geometry
+    if input.atoms.is_empty() {
+        return Err(JsError::new("Geometry must have at least 1 atom."));
+    }
+
+    // 3. Validate basis name
+    let basis_lower = input.basis_name.to_lowercase();
+    let supported_bases = ["sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"];
+    if !supported_bases.contains(&basis_lower.as_str()) {
+        return Err(JsError::new(&format!(
+            "Unknown basis set '{}'. Supported: {}",
+            input.basis_name,
+            supported_bases.join(", ")
+        )));
+    }
+
+    // 4. Determine coordinate units
+    let units_lower = input.units.to_lowercase();
+    let convert_to_bohr = match units_lower.as_str() {
+        "bohr" => false,
+        "angstrom" | "angstroms" => true,
+        _ => {
+            return Err(JsError::new(&format!(
+                "Invalid units '{}'. Must be 'bohr' or 'angstrom'.",
+                input.units
+            )));
+        }
+    };
+
+    // 5. Build atoms
+    let mut atoms: Vec<Atom> = Vec::with_capacity(input.atoms.len());
+    for atom_input in &input.atoms {
+        let atomic_number = symbol_to_atomic_number(&atom_input.symbol).map_err(|_| {
+            JsError::new(&format!(
+                "Unsupported element '{}'. Only H-Ar are supported.",
+                atom_input.symbol
+            ))
+        })?;
+
+        let position_bohr = if convert_to_bohr {
+            [
+                atom_input.xyz[0] * ANGSTROM_TO_BOHR,
+                atom_input.xyz[1] * ANGSTROM_TO_BOHR,
+                atom_input.xyz[2] * ANGSTROM_TO_BOHR,
+            ]
+        } else {
+            atom_input.xyz
+        };
+
+        let atom = Atom::new(atomic_number, position_bohr)
+            .map_err(|e| JsError::new(&format!("Invalid atom: {}", e)))?;
+        atoms.push(atom);
+    }
+
+    // 6. Build basis set
+    let basis = BasisSet::build(atoms, &basis_lower)
+        .map_err(|e| JsError::new(&format!("Failed to build basis set: {}", e)))?;
+
+    // 7. Compute matrices (spherical or Cartesian)
+    let use_spherical = input.use_spherical;
+    let (s_matrix, t_matrix, v_matrix, h_core, nbf) = if use_spherical {
+        let s = overlap_matrix_spherical(&basis);
+        let t = kinetic_matrix_spherical(&basis);
+        let v = nuclear_matrix_spherical(&basis);
+        let h = hcore_matrix_spherical(&basis);
+        let n = basis.n_basis_spherical();
+        (s, t, v, h, n)
+    } else {
+        let s = overlap_matrix(&basis);
+        let t = kinetic_matrix(&basis);
+        let v = nuclear_matrix(&basis);
+        let h = hcore_matrix(&basis);
+        let n = basis.n_basis;
+        (s, t, v, h, n)
+    };
+
+    // 8. Generate basis function labels
+    let labels = generate_basis_labels(&basis, use_spherical);
+
+    // 9. Compute timing
+    let compute_time_ms = js_sys::Date::now() - start_time;
+
+    let result = IntegralMatricesOutput {
+        nbf,
+        labels,
+        s_matrix,
+        t_matrix,
+        v_matrix,
+        h_core,
+        nuclear_repulsion: basis.nuclear_repulsion,
+        compute_time_ms,
+    };
+
+    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// Generate human-readable basis function labels from a BasisSet.
+///
+/// Labels follow the convention: "AtomSymbol ShellType"
+/// e.g., "O 1s", "O 2s", "O 2px", "H1 1s", "H2 1s"
+///
+/// When multiple atoms of the same element exist, they are numbered
+/// to distinguish them (H1, H2, etc.).
+///
+/// # Arguments
+///
+/// * `basis` - The basis set to generate labels for
+/// * `use_spherical` - Whether to use spherical harmonic labels for d-shells
+///
+/// # Returns
+///
+/// A vector of labels, one per basis function, in the same order as the
+/// integral matrix rows/columns.
+fn generate_basis_labels(basis: &qc_core::basis::BasisSet, use_spherical: bool) -> Vec<String> {
+    use qc_core::basis::AngularMomentum;
+    use std::collections::HashMap;
+
+    // Count atoms of each element to decide whether to number them
+    let mut element_counts: HashMap<&str, usize> = HashMap::new();
+    for atom in &basis.atoms {
+        *element_counts.entry(atom.symbol.as_str()).or_insert(0) += 1;
+    }
+
+    // Build per-atom labels: "O", "H1", "H2" etc.
+    let mut element_instance: HashMap<&str, usize> = HashMap::new();
+    let mut atom_labels: Vec<String> = Vec::with_capacity(basis.atoms.len());
+    for atom in &basis.atoms {
+        let sym = atom.symbol.as_str();
+        let count = element_counts[sym];
+        if count > 1 {
+            let instance = element_instance.entry(sym).or_insert(0);
+            *instance += 1;
+            atom_labels.push(format!("{}{}", sym, *instance));
+        } else {
+            atom_labels.push(sym.to_string());
+        }
+    }
+
+    // Track shell counts per atom to generate principal quantum number labels
+    // (1s, 2s, 2p, 3s, 3p, 3d, etc.)
+    let mut atom_s_count: Vec<usize> = vec![0; basis.atoms.len()];
+    let mut atom_p_count: Vec<usize> = vec![0; basis.atoms.len()];
+    let mut atom_d_count: Vec<usize> = vec![0; basis.atoms.len()];
+
+    let mut labels = Vec::with_capacity(basis.n_basis);
+
+    for shell in &basis.shells {
+        let atom_idx = shell.atom_idx;
+        let atom_label = &atom_labels[atom_idx];
+
+        match shell.angular_momentum {
+            AngularMomentum::S => {
+                atom_s_count[atom_idx] += 1;
+                let n = atom_s_count[atom_idx];
+                // Principal quantum number: first s-shell is 1s, second is 2s, etc.
+                labels.push(format!("{} {}s", atom_label, n));
+            }
+            AngularMomentum::P => {
+                atom_p_count[atom_idx] += 1;
+                // P shells start at n=2 minimum
+                let n = atom_p_count[atom_idx] + 1;
+                if use_spherical {
+                    // Spherical: p-1, p0, p+1 -- but for display, use px, py, pz
+                    // (same count for both Cartesian and spherical)
+                    labels.push(format!("{} {}px", atom_label, n));
+                    labels.push(format!("{} {}py", atom_label, n));
+                    labels.push(format!("{} {}pz", atom_label, n));
+                } else {
+                    labels.push(format!("{} {}px", atom_label, n));
+                    labels.push(format!("{} {}py", atom_label, n));
+                    labels.push(format!("{} {}pz", atom_label, n));
+                }
+            }
+            AngularMomentum::D => {
+                atom_d_count[atom_idx] += 1;
+                // D shells start at n=3 minimum
+                let n = atom_d_count[atom_idx] + 2;
+                if use_spherical {
+                    // Spherical harmonics: 5 components
+                    let sph_labels = ["d-2", "d-1", "d0", "d+1", "d+2"];
+                    for sl in &sph_labels {
+                        labels.push(format!("{} {}{}", atom_label, n, sl));
+                    }
+                } else {
+                    // Cartesian: 6 components (xx, xy, xz, yy, yz, zz)
+                    let cart_labels = ["dxx", "dxy", "dxz", "dyy", "dyz", "dzz"];
+                    for cl in &cart_labels {
+                        labels.push(format!("{} {}{}", atom_label, n, cl));
+                    }
+                }
+            }
+        }
+    }
+
+    labels
+}
+
+// ============================================================================
+// Integral Breakdown (US-056)
+// ============================================================================
+
+/// Input for `integral_with_breakdown` WASM export.
+///
+/// Specifies a molecule, basis set, integral type, and basis function indices.
+/// Returns the contracted integral decomposed into primitive-pair contributions.
+///
+/// # Fields
+///
+/// * `atoms` - Atom specifications with element symbols and coordinates
+/// * `basis_name` - Basis set name: "sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"
+/// * `units` - Coordinate units: "bohr" or "angstrom" (default: "bohr")
+/// * `integral_type` - Type of integral: "S", "T", "V", or "Hcore"
+/// * `indices` - Basis function indices [i, j] (0-based)
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct IntegralBreakdownInput {
+    /// List of atoms in the molecule
+    atoms: Vec<AtomInput>,
+    /// Basis set name (e.g., "sto-3g")
+    basis_name: String,
+    /// Coordinate units: "bohr" or "angstrom" (default: "bohr")
+    #[serde(default = "default_units")]
+    units: String,
+    /// Integral type: "S", "T", "V", or "Hcore"
+    integral_type: String,
+    /// Basis function indices [row, col] (0-based)
+    indices: [usize; 2],
+}
+
+/// Compute a single integral and decompose it into primitive-pair contributions.
+///
+/// For a contracted integral I_ij = <chi_i | O | chi_j>, this function
+/// returns all primitive-pair contributions sorted by magnitude, enabling
+/// students to see which Gaussian pairs dominate the integral value.
+///
+/// # Input JSON structure
+///
+/// ```text
+/// {
+///   "atoms": [{ "symbol": "H", "xyz": [0.0, 0.0, 0.0] }, ...],
+///   "units": "bohr",
+///   "basisName": "sto-3g",
+///   "integralType": "S",      // "S" | "T" | "V" | "Hcore"
+///   "indices": [0, 1]         // [row, col] basis function indices (0-based)
+/// }
+/// ```
+///
+/// # Returns
+///
+/// JSON with `IntegralBreakdown` fields (contractedValue, integralType,
+/// indices, labels, primitiveContributions, nPrimI, nPrimJ).
+///
+/// # Errors
+///
+/// Returns JsError for invalid elements, unsupported basis, out-of-range
+/// indices, or invalid integral type.
+///
+/// # Reference
+///
+/// Phase 3 TDD Section 8.2; Phase 3 PRD FR-INT-03; US-056
+#[wasm_bindgen]
+pub fn integral_with_breakdown(input: JsValue) -> Result<JsValue, JsError> {
+    use qc_core::basis::{symbol_to_atomic_number, Atom, BasisSet, ANGSTROM_TO_BOHR};
+
+    // 1. Deserialize input
+    let input: IntegralBreakdownInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid input: {}", e)))?;
+
+    // 2. Validate geometry
+    if input.atoms.is_empty() {
+        return Err(JsError::new("Geometry must have at least 1 atom."));
+    }
+
+    // 3. Validate basis name
+    let basis_lower = input.basis_name.to_lowercase();
+    let supported_bases = ["sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"];
+    if !supported_bases.contains(&basis_lower.as_str()) {
+        return Err(JsError::new(&format!(
+            "Unknown basis set '{}'. Supported: {}",
+            input.basis_name,
+            supported_bases.join(", ")
+        )));
+    }
+
+    // 4. Determine coordinate units
+    let units_lower = input.units.to_lowercase();
+    let convert_to_bohr = match units_lower.as_str() {
+        "bohr" => false,
+        "angstrom" | "angstroms" => true,
+        _ => {
+            return Err(JsError::new(&format!(
+                "Invalid units '{}'. Must be 'bohr' or 'angstrom'.",
+                input.units
+            )));
+        }
+    };
+
+    // 5. Build atoms
+    let mut atoms: Vec<Atom> = Vec::with_capacity(input.atoms.len());
+    for atom_input in &input.atoms {
+        let atomic_number = symbol_to_atomic_number(&atom_input.symbol).map_err(|_| {
+            JsError::new(&format!(
+                "Unsupported element '{}'. Only H-Ar are supported.",
+                atom_input.symbol
+            ))
+        })?;
+
+        let position_bohr = if convert_to_bohr {
+            [
+                atom_input.xyz[0] * ANGSTROM_TO_BOHR,
+                atom_input.xyz[1] * ANGSTROM_TO_BOHR,
+                atom_input.xyz[2] * ANGSTROM_TO_BOHR,
+            ]
+        } else {
+            atom_input.xyz
+        };
+
+        let atom = Atom::new(atomic_number, position_bohr)
+            .map_err(|e| JsError::new(&format!("Invalid atom: {}", e)))?;
+        atoms.push(atom);
+    }
+
+    // 6. Build basis set
+    let basis = BasisSet::build(atoms, &basis_lower)
+        .map_err(|e| JsError::new(&format!("Failed to build basis set: {}", e)))?;
+
+    // 7. Map integral type: "S" -> "overlap", "T" -> "kinetic", "V" -> "nuclear", "Hcore" -> "hcore"
+    let integral_type = match input.integral_type.as_str() {
+        "S" | "overlap" => "overlap",
+        "T" | "kinetic" => "kinetic",
+        "V" | "nuclear" => "nuclear",
+        "Hcore" | "hcore" => "hcore",
+        other => {
+            return Err(JsError::new(&format!(
+                "Invalid integral type '{}'. Must be 'S', 'T', 'V', or 'Hcore'.",
+                other
+            )));
+        }
+    };
+
+    // 8. Compute breakdown
+    let [i, j] = input.indices;
+    let result = qc_core::integrals::integral_with_breakdown(&basis, integral_type, i, j)
+        .map_err(|e| JsError::new(&format!("Breakdown computation failed: {}", e)))?;
+
+    // 9. Serialize and return
+    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// Fock Matrix Decomposition (US-058)
+// ============================================================================
+
+/// Input for Fock matrix decomposition.
+///
+/// Requires geometry, basis set, and a converged density matrix.
+/// The function recomputes H^core and ERIs from the geometry/basis
+/// rather than accepting pre-computed matrices, ensuring consistency.
+///
+/// # Fields
+///
+/// * `atoms` - Atom list with symbols and coordinates
+/// * `basis_name` - Basis set name (e.g., "sto-3g")
+/// * `units` - Coordinate units: "bohr" or "angstrom" (default: "bohr")
+/// * `density_matrix` - Converged density matrix P = 2*C_occ*C_occ^T
+///   (flat row-major, nbf x nbf, includes factor of 2 for RHF)
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct FockDecompositionInput {
+    /// List of atoms in the molecule
+    atoms: Vec<AtomInput>,
+    /// Basis set name (e.g., "sto-3g")
+    basis_name: String,
+    /// Coordinate units: "bohr" or "angstrom" (default: "bohr")
+    #[serde(default = "default_units")]
+    units: String,
+    /// Density matrix P (flat, nbf x nbf, includes factor of 2 for RHF)
+    density_matrix: Vec<f64>,
+}
+
+/// Compute Fock matrix decomposition F = H^core + J - 0.5*K.
+///
+/// Decomposes the Fock matrix into its physical components for educational
+/// inspection. Recomputes all integrals from the geometry and basis set,
+/// then builds separate J (Coulomb) and K (Exchange) matrices using the
+/// provided converged density matrix.
+///
+/// # Input JSON structure
+///
+/// ```text
+/// {
+///   "atoms": [{ "symbol": "H", "xyz": [0.0, 0.0, 0.0] }, ...],
+///   "basisName": "sto-3g",
+///   "units": "bohr",
+///   "densityMatrix": [0.602, 0.602, 0.602, 0.602]
+/// }
+/// ```
+///
+/// # Returns
+///
+/// JSON with `FockDecomposition` fields (hCore, jMatrix, kMatrix, gMatrix,
+/// fMatrix, density, nbf, labels).
+///
+/// # Errors
+///
+/// Returns JsError for invalid elements, unsupported basis, or density matrix
+/// dimension mismatch.
+///
+/// # References
+///
+/// - Szabo & Ostlund (1996), Eq. 3.154
+/// - US-058 Fock Build Tracing
+#[wasm_bindgen]
+pub fn fock_decomposition(input: JsValue) -> Result<JsValue, JsError> {
+    use qc_core::basis::{symbol_to_atomic_number, Atom, BasisSet, ANGSTROM_TO_BOHR};
+    use qc_core::integrals::{eri_compressed, hcore_matrix};
+
+    // 1. Deserialize input
+    let input: FockDecompositionInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid input: {}", e)))?;
+
+    // 2. Validate geometry
+    if input.atoms.is_empty() {
+        return Err(JsError::new("Geometry must have at least 1 atom."));
+    }
+
+    // 3. Validate basis name
+    let basis_lower = input.basis_name.to_lowercase();
+    let supported_bases = ["sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"];
+    if !supported_bases.contains(&basis_lower.as_str()) {
+        return Err(JsError::new(&format!(
+            "Unknown basis set '{}'. Supported: {}",
+            input.basis_name,
+            supported_bases.join(", ")
+        )));
+    }
+
+    // 4. Determine coordinate units
+    let units_lower = input.units.to_lowercase();
+    let convert_to_bohr = match units_lower.as_str() {
+        "bohr" => false,
+        "angstrom" | "angstroms" => true,
+        _ => {
+            return Err(JsError::new(&format!(
+                "Invalid units '{}'. Must be 'bohr' or 'angstrom'.",
+                input.units
+            )));
+        }
+    };
+
+    // 5. Build atoms
+    let mut atoms: Vec<Atom> = Vec::with_capacity(input.atoms.len());
+    for atom_input in &input.atoms {
+        let atomic_number = symbol_to_atomic_number(&atom_input.symbol).map_err(|_| {
+            JsError::new(&format!(
+                "Unsupported element '{}'. Only H-Ar are supported.",
+                atom_input.symbol
+            ))
+        })?;
+
+        let position_bohr = if convert_to_bohr {
+            [
+                atom_input.xyz[0] * ANGSTROM_TO_BOHR,
+                atom_input.xyz[1] * ANGSTROM_TO_BOHR,
+                atom_input.xyz[2] * ANGSTROM_TO_BOHR,
+            ]
+        } else {
+            atom_input.xyz
+        };
+
+        let atom = Atom::new(atomic_number, position_bohr)
+            .map_err(|e| JsError::new(&format!("Invalid atom: {}", e)))?;
+        atoms.push(atom);
+    }
+
+    // 6. Build basis set
+    let basis = BasisSet::build(atoms, &basis_lower)
+        .map_err(|e| JsError::new(&format!("Failed to build basis set: {}", e)))?;
+
+    let nbf = basis.n_basis;
+
+    // 7. Validate density matrix dimensions
+    let expected_size = nbf * nbf;
+    if input.density_matrix.len() != expected_size {
+        return Err(JsError::new(&format!(
+            "Density matrix size mismatch: expected {} ({}x{}), got {}",
+            expected_size,
+            nbf,
+            nbf,
+            input.density_matrix.len()
+        )));
+    }
+
+    // 8. Compute integrals (H^core and ERI)
+    let h_core = hcore_matrix(&basis);
+    let eri = eri_compressed(&basis);
+
+    // 9. Generate basis function labels (Cartesian, matching SCF convention)
+    let labels = generate_basis_labels(&basis, false);
+
+    // 10. Compute Fock decomposition
+    let decomp = qc_core::scf::fock::compute_fock_decomposition(
+        &h_core,
+        &eri,
+        &input.density_matrix,
+        nbf,
+        labels,
+    );
+
+    // 11. Serialize and return
+    serde_wasm_bindgen::to_value(&decomp).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// ERI Detail / Breakdown (US-059)
+// ============================================================================
+
+/// Input for `eri_detail` WASM export.
+///
+/// Specifies a molecule, basis set, and four basis function indices.
+/// Returns the contracted ERI decomposed into primitive-quartet contributions.
+///
+/// # Fields
+///
+/// * `atoms` - Atom specifications with element symbols and coordinates
+/// * `basis_name` - Basis set name: "sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"
+/// * `units` - Coordinate units: "bohr" or "angstrom" (default: "bohr")
+/// * `indices` - Basis function indices [i, j, k, l] (0-based)
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+struct EriDetailInput {
+    /// List of atoms in the molecule
+    atoms: Vec<AtomInput>,
+    /// Basis set name (e.g., "sto-3g")
+    basis_name: String,
+    /// Coordinate units: "bohr" or "angstrom" (default: "bohr")
+    #[serde(default = "default_units")]
+    units: String,
+    /// Basis function indices [i, j, k, l] (0-based)
+    indices: [usize; 4],
+}
+
+/// Compute a single ERI and decompose it into primitive-quartet contributions.
+///
+/// For a contracted ERI (ij|kl), this function returns all primitive-quartet
+/// contributions sorted by magnitude, the computational method (Boys function
+/// or Rys quadrature), and representative Rys roots/weights. This enables
+/// students to see which primitive quartets dominate and how the integral
+/// connects to the Rys quadrature concepts from Module B.
+///
+/// # Input JSON structure
+///
+/// ```text
+/// {
+///   "atoms": [{ "symbol": "H", "xyz": [0.0, 0.0, 0.0] }, ...],
+///   "units": "bohr",
+///   "basisName": "sto-3g",
+///   "indices": [0, 0, 1, 1]
+/// }
+/// ```
+///
+/// # Returns
+///
+/// JSON with `EriBreakdown` fields (contractedValue, indices, labels,
+/// method, contributions, nPrimitives, totalAngularMomentum, nroots).
+///
+/// # Errors
+///
+/// Returns JsError for invalid elements, unsupported basis, or out-of-range
+/// indices.
+///
+/// # Reference
+///
+/// Phase 3 PRD FR-INT-04; US-059 ERI Browser
+#[wasm_bindgen]
+pub fn eri_detail(input: JsValue) -> Result<JsValue, JsError> {
+    use qc_core::basis::{symbol_to_atomic_number, Atom, BasisSet, ANGSTROM_TO_BOHR};
+
+    // 1. Deserialize input
+    let input: EriDetailInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid input: {}", e)))?;
+
+    // 2. Validate geometry
+    if input.atoms.is_empty() {
+        return Err(JsError::new("Geometry must have at least 1 atom."));
+    }
+
+    // 3. Validate basis name
+    let basis_lower = input.basis_name.to_lowercase();
+    let supported_bases = ["sto-3g", "3-21g", "6-31g", "6-31g*", "6-31+g*", "cc-pvdz"];
+    if !supported_bases.contains(&basis_lower.as_str()) {
+        return Err(JsError::new(&format!(
+            "Unknown basis set '{}'. Supported: {}",
+            input.basis_name,
+            supported_bases.join(", ")
+        )));
+    }
+
+    // 4. Determine coordinate units
+    let units_lower = input.units.to_lowercase();
+    let convert_to_bohr = match units_lower.as_str() {
+        "bohr" => false,
+        "angstrom" | "angstroms" => true,
+        _ => {
+            return Err(JsError::new(&format!(
+                "Invalid units '{}'. Must be 'bohr' or 'angstrom'.",
+                input.units
+            )));
+        }
+    };
+
+    // 5. Build atoms
+    let mut atoms: Vec<Atom> = Vec::with_capacity(input.atoms.len());
+    for atom_input in &input.atoms {
+        let atomic_number = symbol_to_atomic_number(&atom_input.symbol).map_err(|_| {
+            JsError::new(&format!(
+                "Unsupported element '{}'. Only H-Ar are supported.",
+                atom_input.symbol
+            ))
+        })?;
+
+        let position_bohr = if convert_to_bohr {
+            [
+                atom_input.xyz[0] * ANGSTROM_TO_BOHR,
+                atom_input.xyz[1] * ANGSTROM_TO_BOHR,
+                atom_input.xyz[2] * ANGSTROM_TO_BOHR,
+            ]
+        } else {
+            atom_input.xyz
+        };
+
+        let atom = Atom::new(atomic_number, position_bohr)
+            .map_err(|e| JsError::new(&format!("Invalid atom: {}", e)))?;
+        atoms.push(atom);
+    }
+
+    // 6. Build basis set
+    let basis = BasisSet::build(atoms, &basis_lower)
+        .map_err(|e| JsError::new(&format!("Failed to build basis set: {}", e)))?;
+
+    // 7. Compute ERI breakdown
+    let [i, j, k, l] = input.indices;
+    let result = qc_core::integrals::eri_with_breakdown(&basis, i, j, k, l)
+        .map_err(|e| JsError::new(&format!("ERI breakdown computation failed: {}", e)))?;
+
+    // 8. Serialize and return
+    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// Density Grid Evaluation WASM Bindings (US-061)
+// ============================================================================
+
+/// WASM-friendly density grid evaluation input struct.
+///
+/// Contains the density matrix, basis set specification, and grid parameters
+/// needed to evaluate the electron density rho(r) on a 3D grid.
+///
+/// The electron density is:
+///   rho(r) = sum_{mu,nu} D_{mu,nu} * chi_mu(r) * chi_nu(r)
+///
+/// where D is the density matrix and chi are basis functions.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DensityGridWasmInput {
+    /// Flattened density matrix (row-major, n_basis x n_basis)
+    pub density_matrix: Vec<f64>,
+    /// Atom specifications: [[Z, x, y, z], ...] in Bohr
+    pub atoms: Vec<[f64; 4]>,
+    /// Basis set name (e.g., "sto-3g")
+    pub basis_name: String,
+    /// Grid origin [x, y, z] in Bohr
+    pub grid_origin: [f64; 3],
+    /// Grid spacing in Bohr (uniform)
+    pub grid_spacing: f64,
+    /// Grid dimensions [nx, ny, nz]
+    pub grid_dims: [usize; 3],
+    /// Number of electrons (for integrated density validation)
+    pub n_electrons: usize,
+    /// Whether the density matrix is in the spherical harmonic basis.
+    /// When true, the density matrix is transformed from spherical to Cartesian
+    /// before grid evaluation (since the grid evaluator uses Cartesian GTOs).
+    /// This must match the `useSpherical` option used in the SCF calculation.
+    #[serde(default)]
+    pub use_spherical: bool,
+}
+
+/// Result of density grid evaluation.
+///
+/// Contains the grid values and metadata for isosurface extraction.
+/// Grid values use C-order indexing: index = ix * ny * nz + iy * nz + iz.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DensityGridResult {
+    /// Flat array of density values (C-order: x-slowest, z-fastest)
+    pub values: Vec<f64>,
+    /// Grid origin [x, y, z] in Bohr
+    pub grid_origin: [f64; 3],
+    /// Grid spacing in Bohr
+    pub grid_spacing: f64,
+    /// Grid dimensions [nx, ny, nz]
+    pub grid_dims: [usize; 3],
+    /// Integrated density (should approximate n_electrons)
+    pub integrated_density: f64,
+    /// Expected number of electrons
+    pub n_electrons_expected: usize,
+    /// Maximum density value
+    pub max_density: f64,
+    /// Computation time in milliseconds
+    pub compute_time_ms: f64,
+}
+
+/// Evaluate the electron density on a 3D grid.
+///
+/// Computes rho(r) = sum_{mu,nu} D_{mu,nu} * chi_mu(r) * chi_nu(r) on a
+/// uniform 3D grid, where chi_mu are contracted Gaussian basis functions
+/// and D is the one-electron density matrix.
+///
+/// The density matrix is typically obtained from an SCF calculation as
+/// D = C_occ * C_occ^T (where C_occ contains the occupied MO coefficients).
+///
+/// # Arguments
+///
+/// * `input` - JavaScript object containing `DensityGridWasmInput` fields:
+///   - `densityMatrix`: Flattened density matrix (row-major, n_basis x n_basis)
+///   - `atoms`: Atom specifications [[Z, x, y, z], ...] in Bohr
+///   - `basisName`: Basis set name (e.g., "sto-3g")
+///   - `gridOrigin`: Grid origin [x, y, z] in Bohr
+///   - `gridSpacing`: Uniform grid spacing in Bohr
+///   - `gridDims`: Grid dimensions [nx, ny, nz]
+///   - `nElectrons`: Number of electrons (for validation)
+///   - `useSpherical`: Whether density matrix uses spherical harmonics
+///
+/// # Returns
+///
+/// A JavaScript object containing `DensityGridResult`:
+/// - `values`: Flat array of density values (C-order: x-slowest, z-fastest)
+/// - `gridOrigin`: Grid origin [x, y, z] in Bohr
+/// - `gridSpacing`: Uniform grid spacing in Bohr
+/// - `gridDims`: Grid dimensions [nx, ny, nz]
+/// - `integratedDensity`: Approximate integral of rho(r) over the grid
+/// - `nElectronsExpected`: Expected number of electrons
+/// - `maxDensity`: Maximum density value on the grid
+/// - `computeTimeMs`: Computation time in milliseconds
+///
+/// # Example
+///
+/// ```javascript
+/// const input = {
+///   densityMatrix: [0.6, 0.4, 0.4, 0.6],
+///   atoms: [[1, 0, 0, 0], [1, 0, 0, 1.4]],
+///   basisName: "sto-3g",
+///   gridOrigin: [-5, -5, -5],
+///   gridSpacing: 0.5,
+///   gridDims: [21, 21, 23],
+///   nElectrons: 2,
+/// };
+///
+/// const result = evaluate_density_grid(input);
+/// console.log(`Integrated density: ${result.integratedDensity}`);
+/// console.log(`Max density: ${result.maxDensity}`);
+/// ```
+#[wasm_bindgen]
+pub fn evaluate_density_grid(input: JsValue) -> Result<JsValue, JsError> {
+    use qc_core::basis::{Atom, BasisSet};
+
+    // 1. Deserialize input
+    let wasm_input: DensityGridWasmInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid density grid input: {}", e)))?;
+
+    // 2. Validate input
+    if wasm_input.atoms.is_empty() {
+        return Err(JsError::new(
+            "evaluate_density_grid: atoms array must not be empty",
+        ));
+    }
+    if wasm_input.grid_dims.iter().any(|&d| d < 2) {
+        return Err(JsError::new(
+            "evaluate_density_grid: grid dimensions must be >= 2",
+        ));
+    }
+    if wasm_input.grid_spacing <= 0.0 {
+        return Err(JsError::new(&format!(
+            "evaluate_density_grid: grid spacing must be positive, got {}",
+            wasm_input.grid_spacing
+        )));
+    }
+
+    // 3. Build basis set from atom specs
+    let atoms: Result<Vec<Atom>, _> = wasm_input
+        .atoms
+        .iter()
+        .map(|a| {
+            let z = a[0] as u8;
+            Atom::new(z, [a[1], a[2], a[3]])
+        })
+        .collect();
+    let atoms = atoms.map_err(|e| JsError::new(&format!("Invalid atom: {}", e)))?;
+    let basis = BasisSet::build(atoms, &wasm_input.basis_name)
+        .map_err(|e| JsError::new(&format!("Invalid basis set: {}", e)))?;
+
+    // 4. If density matrix is in spherical basis, transform to Cartesian.
+    //    The grid evaluator uses Cartesian GTOs (6 d-functions), so
+    //    spherical density matrices (5 d-functions) must be expanded.
+    //
+    //    For a density matrix:
+    //      D_cart = C_full * D_sph * C_full^T
+    //    where C_full is block-diagonal: identity for s/p, 6x5 for d shells.
+    let n_cart = basis.n_basis;
+    let density_matrix = if wasm_input.use_spherical && basis.has_spherical_difference() {
+        use qc_core::integrals::SphericalTransform;
+
+        let n_sph = basis.n_basis_spherical();
+        if wasm_input.density_matrix.len() != n_sph * n_sph {
+            return Err(JsError::new(&format!(
+                "evaluate_density_grid: density matrix size {} does not match spherical basis size {}x{}={}",
+                wasm_input.density_matrix.len(),
+                n_sph, n_sph, n_sph * n_sph
+            )));
+        }
+
+        // Build block-diagonal transformation matrix C_full (n_cart x n_sph)
+        // C_full is block-diagonal with identity for s/p shells and T[6x5] for d shells
+        let mut c_full = vec![0.0f64; n_cart * n_sph];
+
+        let mut cart_offset = 0;
+        let mut sph_offset = 0;
+
+        for shell in &basis.shells {
+            let l = shell.l_value();
+            let transform = SphericalTransform::new(l);
+            let n_s = transform.n_sph;
+            let n_c = transform.n_cart;
+
+            if transform.needs_transform() {
+                // d-shell (or higher): fill in the transformation coefficients
+                for c in 0..n_c {
+                    for m in 0..n_s {
+                        c_full[(cart_offset + c) * n_sph + (sph_offset + m)] =
+                            transform.coeff(c, m);
+                    }
+                }
+            } else {
+                // s/p shell: identity block
+                for m in 0..n_s {
+                    c_full[(cart_offset + m) * n_sph + (sph_offset + m)] = 1.0;
+                }
+            }
+
+            cart_offset += n_c;
+            sph_offset += n_s;
+        }
+
+        // Compute D_cart = C_full * D_sph * C_full^T
+        // Step 1: temp = D_sph * C_full^T  (n_sph x n_cart)
+        let mut temp = vec![0.0f64; n_sph * n_cart];
+        for i in 0..n_sph {
+            for j in 0..n_cart {
+                let mut sum = 0.0;
+                for k in 0..n_sph {
+                    sum += wasm_input.density_matrix[i * n_sph + k] * c_full[j * n_sph + k];
+                    // C_full^T[k][j] = C_full[j][k]
+                }
+                temp[i * n_cart + j] = sum;
+            }
+        }
+
+        // Step 2: D_cart = C_full * temp  (n_cart x n_cart)
+        let mut d_cart = vec![0.0f64; n_cart * n_cart];
+        for i in 0..n_cart {
+            for j in 0..n_cart {
+                let mut sum = 0.0;
+                for k in 0..n_sph {
+                    sum += c_full[i * n_sph + k] * temp[k * n_cart + j];
+                }
+                d_cart[i * n_cart + j] = sum;
+            }
+        }
+
+        d_cart
+    } else {
+        if wasm_input.density_matrix.len() != n_cart * n_cart {
+            return Err(JsError::new(&format!(
+                "evaluate_density_grid: density matrix size {} does not match Cartesian basis size {}x{}={}",
+                wasm_input.density_matrix.len(),
+                n_cart, n_cart, n_cart * n_cart
+            )));
+        }
+        wasm_input.density_matrix
+    };
+
+    // 5. Evaluate density on grid
+    //    rho(r) = sum_{mu,nu} D_{mu,nu} * chi_mu(r) * chi_nu(r)
+    //
+    //    Strategy: evaluate all basis functions on the grid, then contract
+    //    with the density matrix. This is more memory-intensive than the
+    //    MO grid evaluator but simpler, since we need all pairwise products.
+    let [nx, ny, nz] = wasm_input.grid_dims;
+    let total_points = nx * ny * nz;
+    let mut grid_values = vec![0.0f64; total_points];
+
+    // Allocate basis function values: basis_values[mu][grid_idx]
+    let mut basis_values = vec![vec![0.0f64; total_points]; n_cart];
+
+    // Evaluate each basis function on the entire grid (shell-batched)
+    let mut basis_offset = 0;
+    for shell in &basis.shells {
+        let l = shell.l_value();
+        let n_funcs = shell.n_basis_functions();
+        let [cx, cy, cz] = shell.center;
+
+        // Extract primitive exponents and coefficients
+        let primitives: Vec<(f64, f64)> = shell
+            .primitives
+            .iter()
+            .map(|p| (p.exponent, p.coefficient))
+            .collect();
+
+        for ix in 0..nx {
+            let x = wasm_input.grid_origin[0] + ix as f64 * wasm_input.grid_spacing;
+            let dx = x - cx;
+            for iy in 0..ny {
+                let y = wasm_input.grid_origin[1] + iy as f64 * wasm_input.grid_spacing;
+                let dy = y - cy;
+                for iz in 0..nz {
+                    let z = wasm_input.grid_origin[2] + iz as f64 * wasm_input.grid_spacing;
+                    let dz = z - cz;
+
+                    let r2 = dx * dx + dy * dy + dz * dz;
+
+                    // Compute radial part: sum of contracted primitives
+                    let mut radial = 0.0;
+                    for &(exp, coef) in &primitives {
+                        radial += coef * (-exp * r2).exp();
+                    }
+
+                    // Compute angular parts and store basis function values
+                    let idx = ix * ny * nz + iy * nz + iz;
+                    match l {
+                        0 => {
+                            // s: 1
+                            basis_values[basis_offset][idx] = radial;
+                        }
+                        1 => {
+                            // p: x, y, z
+                            basis_values[basis_offset][idx] = dx * radial;
+                            basis_values[basis_offset + 1][idx] = dy * radial;
+                            basis_values[basis_offset + 2][idx] = dz * radial;
+                        }
+                        2 => {
+                            // d (Cartesian): xx, yy, zz, xy, xz, yz
+                            basis_values[basis_offset][idx] = dx * dx * radial;
+                            basis_values[basis_offset + 1][idx] = dy * dy * radial;
+                            basis_values[basis_offset + 2][idx] = dz * dz * radial;
+                            basis_values[basis_offset + 3][idx] = dx * dy * radial;
+                            basis_values[basis_offset + 4][idx] = dx * dz * radial;
+                            basis_values[basis_offset + 5][idx] = dy * dz * radial;
+                        }
+                        _ => {
+                            return Err(JsError::new(&format!(
+                                "evaluate_density_grid: unsupported angular momentum l={}",
+                                l
+                            )));
+                        }
+                    }
+                }
+            }
+        }
+
+        basis_offset += n_funcs;
+    }
+
+    // Contract with density matrix: rho(r) = sum_{mu,nu} D[mu,nu] * chi_mu(r) * chi_nu(r)
+    for mu in 0..n_cart {
+        for nu in 0..n_cart {
+            let d_mu_nu = density_matrix[mu * n_cart + nu];
+            if d_mu_nu.abs() < 1e-15 {
+                continue; // Skip negligible density matrix elements
+            }
+            let chi_mu = &basis_values[mu];
+            let chi_nu = &basis_values[nu];
+            for (gv, (&bmu, &bnu)) in grid_values.iter_mut().zip(chi_mu.iter().zip(chi_nu.iter())) {
+                *gv += d_mu_nu * bmu * bnu;
+            }
+        }
+    }
+
+    // 6. Compute metadata
+    let dv = wasm_input.grid_spacing.powi(3);
+    let integrated_density: f64 = grid_values.iter().sum::<f64>() * dv;
+    let max_density = grid_values.iter().cloned().fold(0.0f64, f64::max);
+
+    let output = DensityGridResult {
+        values: grid_values,
+        grid_origin: wasm_input.grid_origin,
+        grid_spacing: wasm_input.grid_spacing,
+        grid_dims: wasm_input.grid_dims,
+        integrated_density,
+        n_electrons_expected: wasm_input.n_electrons,
+        max_density,
+        compute_time_ms: 0.0, // Cannot time in WASM without web_sys::Performance
+    };
+
+    // 7. Serialize and return
+    serde_wasm_bindgen::to_value(&output).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// Difference Density (Promolecule)
+// ============================================================================
+
+/// WASM input for difference density computation.
+///
+/// Takes the pre-computed molecular density grid and atom positions,
+/// computes the promolecule density from embedded atomic density data,
+/// and returns Delta-rho = rho_molecule - rho_promolecule.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DifferenceDensityWasmInput {
+    /// Flat molecular density grid values (from evaluate_density_grid)
+    pub total_density: Vec<f64>,
+    /// Atom specifications: [[Z, x, y, z], ...] in Bohr
+    pub atoms: Vec<[f64; 4]>,
+    /// Grid origin [x, y, z] in Bohr
+    pub grid_origin: [f64; 3],
+    /// Grid spacing in Bohr (uniform)
+    pub grid_spacing: f64,
+    /// Grid dimensions [nx, ny, nz]
+    pub grid_dims: [usize; 3],
+}
+
+/// Result of difference density computation.
+///
+/// Contains the difference density grid values and summary statistics.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DifferenceDensityWasmResult {
+    /// Flat Delta-rho values at each grid point (C-order: x-slowest, z-fastest)
+    pub values: Vec<f64>,
+    /// Grid origin [x, y, z] in Bohr
+    pub grid_origin: [f64; 3],
+    /// Grid spacing in Bohr
+    pub grid_spacing: f64,
+    /// Grid dimensions [nx, ny, nz]
+    pub grid_dims: [usize; 3],
+    /// Integrated Delta-rho: sum(Delta-rho) * dV (should be ~0)
+    pub integrated_delta_rho: f64,
+    /// Maximum positive Delta-rho (electron accumulation)
+    pub max_accumulation: f64,
+    /// Maximum negative Delta-rho (electron depletion)
+    pub max_depletion: f64,
+    /// Computation time in milliseconds
+    pub compute_time_ms: f64,
+}
+
+/// Compute the difference density (deformation density) for a molecular system.
+///
+/// This function:
+/// 1. Looks up atomic density profiles from embedded data (H-Ar, UHF/STO-3G)
+/// 2. Evaluates the promolecule density on the same grid as the molecular density
+/// 3. Computes Delta-rho = rho_molecule - rho_promolecule
+///
+/// # Physical Interpretation
+///
+/// - **Positive Delta-rho**: electron accumulation (bonding regions)
+/// - **Negative Delta-rho**: electron depletion (antibonding regions)
+/// - **Integrated Delta-rho ~ 0**: density conservation (same total electrons)
+///
+/// # Arguments
+///
+/// * `input` - JavaScript object containing `DifferenceDensityWasmInput` fields:
+///   - `totalDensity`: Flat molecular density grid values
+///   - `atoms`: Atom specifications [[Z, x, y, z], ...] in Bohr
+///   - `gridOrigin`: Grid origin [x, y, z] in Bohr
+///   - `gridSpacing`: Uniform grid spacing in Bohr
+///   - `gridDims`: Grid dimensions [nx, ny, nz]
+///
+/// # Returns
+///
+/// A JavaScript object containing `DifferenceDensityWasmResult`:
+/// - `values`: Flat array of Delta-rho values
+/// - `gridOrigin`, `gridSpacing`, `gridDims`: Grid specification (echo back)
+/// - `integratedDeltaRho`: Sum * dV (should be ~0)
+/// - `maxAccumulation`: Maximum positive Delta-rho
+/// - `maxDepletion`: Maximum negative Delta-rho (as negative number)
+/// - `computeTimeMs`: Computation time in milliseconds
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Any atom has an unsupported atomic number (Z > 18 or Z < 1)
+/// - Grid dimensions are < 2
+/// - Grid spacing is non-positive
+/// - The total density array size does not match grid dimensions
+///
+/// # Example
+///
+/// ```javascript
+/// const input = {
+///   totalDensity: [...],  // from evaluate_density_grid()
+///   atoms: [[1, 0, 0, 0], [1, 0, 0, 1.4]],
+///   gridOrigin: [-5, -5, -5],
+///   gridSpacing: 0.3,
+///   gridDims: [34, 34, 38],
+/// };
+///
+/// const result = compute_difference_density(input);
+/// console.log(`Integrated: ${result.integratedDeltaRho}`);
+/// console.log(`Max accumulation: ${result.maxAccumulation}`);
+/// ```
+#[wasm_bindgen]
+pub fn compute_difference_density(input: JsValue) -> Result<JsValue, JsError> {
+    use qc_core::orbital::promolecule;
+
+    // 1. Deserialize input
+    let wasm_input: DifferenceDensityWasmInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid difference density input: {}", e)))?;
+
+    // 2. Validate input
+    if wasm_input.atoms.is_empty() {
+        return Err(JsError::new(
+            "compute_difference_density: atoms array must not be empty",
+        ));
+    }
+    if wasm_input.grid_dims.iter().any(|&d| d < 2) {
+        return Err(JsError::new(
+            "compute_difference_density: grid dimensions must be >= 2",
+        ));
+    }
+    if wasm_input.grid_spacing <= 0.0 {
+        return Err(JsError::new(&format!(
+            "compute_difference_density: grid spacing must be positive, got {}",
+            wasm_input.grid_spacing
+        )));
+    }
+
+    let expected_size = wasm_input.grid_dims[0] * wasm_input.grid_dims[1] * wasm_input.grid_dims[2];
+    if wasm_input.total_density.len() != expected_size {
+        return Err(JsError::new(&format!(
+            "compute_difference_density: total density size {} does not match grid {}x{}x{}={}",
+            wasm_input.total_density.len(),
+            wasm_input.grid_dims[0],
+            wasm_input.grid_dims[1],
+            wasm_input.grid_dims[2],
+            expected_size
+        )));
+    }
+
+    // 3. Check that all elements are supported (H-Ar)
+    let unsupported: Vec<u32> = wasm_input
+        .atoms
+        .iter()
+        .map(|a| a[0] as u32)
+        .filter(|&z| promolecule::get_atomic_density(z).is_none())
+        .collect();
+    if !unsupported.is_empty() {
+        return Err(JsError::new(&format!(
+            "compute_difference_density: unsupported elements (Z > 18): {:?}",
+            unsupported
+        )));
+    }
+
+    // 4. Prepare atom specifications for promolecule evaluation
+    let atoms: Vec<(u32, [f64; 3])> = wasm_input
+        .atoms
+        .iter()
+        .map(|a| (a[0] as u32, [a[1], a[2], a[3]]))
+        .collect();
+
+    // 5. Evaluate promolecule density on the same grid
+    let promolecule_density = promolecule::evaluate_promolecule_on_grid(
+        &atoms,
+        wasm_input.grid_origin,
+        wasm_input.grid_spacing,
+        wasm_input.grid_dims,
+    )
+    .map_err(|e| JsError::new(&format!("compute_difference_density: {}", e)))?;
+
+    // 6. Compute difference density
+    let diff_result = promolecule::compute_difference_density(
+        &wasm_input.total_density,
+        &promolecule_density,
+        wasm_input.grid_spacing,
+    )
+    .map_err(|e| JsError::new(&format!("compute_difference_density: {}", e)))?;
+
+    // 7. Build output
+    let output = DifferenceDensityWasmResult {
+        values: diff_result.values,
+        grid_origin: wasm_input.grid_origin,
+        grid_spacing: wasm_input.grid_spacing,
+        grid_dims: wasm_input.grid_dims,
+        integrated_delta_rho: diff_result.integrated_delta_rho,
+        max_accumulation: diff_result.max_accumulation,
+        max_depletion: diff_result.max_depletion,
+        compute_time_ms: 0.0,
+    };
+
+    // 8. Serialize and return
+    serde_wasm_bindgen::to_value(&output).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// Internal Coordinate PES Scan WASM Bindings (US-081)
+// ============================================================================
+
+/// WASM-friendly input struct for internal coordinate PES scans.
+///
+/// Accepts both rigid and relaxed scans over bond, angle, or dihedral
+/// coordinates. Deserialized from JavaScript via serde-wasm-bindgen.
+///
+/// # Coordinate Types
+///
+/// - `"bond"`: Distance between two atoms (bohr). Requires 2 atom indices.
+/// - `"angle"`: Bond angle i-j-k where j is central (radians). Requires 3 atom indices.
+/// - `"dihedral"`: Torsion angle i-j-k-l about j-k bond (radians). Requires 4 atom indices.
+///
+/// # Scan Modes
+///
+/// - `"rigid"`: Only the scanned coordinate changes; all other coordinates frozen.
+/// - `"relaxed"`: Non-scanned coordinates are optimized at each scan point via
+///   constrained L-BFGS, giving a true relaxed PES.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PesScanInternalWasmInput {
+    /// Atoms as [[Z, x, y, z], ...] where Z is atomic number and
+    /// x, y, z are coordinates in bohr
+    pub atoms: Vec<[f64; 4]>,
+
+    /// Basis set name (e.g., "sto-3g", "6-31g*")
+    pub basis_name: String,
+
+    /// Electronic structure method: "rhf", "lda", "b3lyp", "b3lyp-d3bj"
+    pub method: String,
+
+    /// Type of coordinate to scan: "bond", "angle", or "dihedral"
+    pub coordinate_type: String,
+
+    /// Atom indices defining the coordinate:
+    /// - Bond: [i, j] (2 indices)
+    /// - Angle: [i, j, k] (3 indices, j = central)
+    /// - Dihedral: [i, j, k, l] (4 indices)
+    pub atom_indices: Vec<usize>,
+
+    /// Scan mode: "rigid" or "relaxed"
+    pub scan_mode: String,
+
+    /// Minimum coordinate value (bohr for bonds, radians for angles)
+    pub value_min: f64,
+
+    /// Maximum coordinate value
+    pub value_max: f64,
+
+    /// Number of evenly spaced scan points (must be >= 2)
+    pub n_points: usize,
+
+    /// Whether to seed density from previous scan point (default: true)
+    #[serde(default = "default_use_seeding_internal")]
+    pub use_seeding: bool,
+
+    /// Whether to use spherical harmonics for d/f functions (default: true)
+    #[serde(default = "default_use_spherical_internal")]
+    pub use_spherical: bool,
+
+    /// Convergence profile: "loose", "medium", or "tight" (default: "tight")
+    #[serde(default = "default_convergence_profile_internal")]
+    pub convergence_profile: String,
+
+    /// Maximum optimization steps per scan point for relaxed scans (default: 50)
+    #[serde(default)]
+    pub opt_max_steps: Option<usize>,
+
+    /// Gradient convergence threshold for relaxed scans in Ha/bohr (default: 4.5e-4)
+    #[serde(default)]
+    pub opt_grad_threshold: Option<f64>,
+}
+
+fn default_use_seeding_internal() -> bool {
+    true
+}
+fn default_use_spherical_internal() -> bool {
+    true
+}
+fn default_convergence_profile_internal() -> String {
+    "tight".to_string()
+}
+
+/// Progress emitted after each completed scan point.
+///
+/// Serialized and passed to the JavaScript progress callback.
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PesScanInternalWasmProgress {
+    /// Index of the completed point (0-indexed)
+    pub point_index: usize,
+    /// Total number of scan points
+    pub total_points: usize,
+    /// Value of the scanned coordinate at this point
+    pub coordinate_value: f64,
+    /// SCF energy in Hartree
+    pub energy: f64,
+    /// Whether SCF converged at this geometry
+    pub converged: bool,
+    /// Number of optimization steps (None for rigid scans)
+    pub opt_steps: Option<usize>,
+}
+
+/// Run an internal coordinate PES scan.
+///
+/// Supports bond, angle, and dihedral scans in both rigid and relaxed
+/// modes. Progress is reported after each scan point via the callback.
+///
+/// # Arguments
+///
+/// * `input` - JavaScript object matching `PesScanInternalWasmInput`
+/// * `progress_callback` - JavaScript function called after each point
+///   with a `PesScanInternalWasmProgress` object
+///
+/// # Returns
+///
+/// A JavaScript object matching `PesScanInternalResult` from qc-core:
+/// - `coordinateType`: "bond" | "angle" | "dihedral"
+/// - `atomIndices`: number[]
+/// - `points`: PesInternalPoint[]
+/// - `equilibrium`: PesInternalEquilibrium | null
+/// - `totalIterations`: number
+/// - `scanMode`: "rigid" | "relaxed"
+/// - `totalOptSteps`: number
+///
+/// # Errors
+///
+/// Returns a `JsError` if:
+/// - Input deserialization fails
+/// - `coordinate_type` is not "bond", "angle", or "dihedral"
+/// - `atom_indices` length does not match coordinate type (2, 3, or 4)
+/// - `scan_mode` is not "rigid" or "relaxed"
+/// - `n_points` < 2
+/// - `value_min` >= `value_max`
+/// - Any atom index >= atoms.len()
+/// - `method` is not a supported method
+///
+/// # Example
+///
+/// ```javascript
+/// import { pes_scan_internal } from './qc_wasm.js';
+///
+/// const input = {
+///   atoms: [[1, 0, 0, 0], [1, 0, 0, 1.4]],
+///   basisName: "sto-3g",
+///   method: "rhf",
+///   coordinateType: "bond",
+///   atomIndices: [0, 1],
+///   scanMode: "rigid",
+///   valueMin: 0.5,
+///   valueMax: 5.0,
+///   nPoints: 20,
+/// };
+///
+/// const result = pes_scan_internal(input, (progress) => {
+///   console.log(`Point ${progress.pointIndex}/${progress.totalPoints}`);
+/// });
+/// ```
+#[wasm_bindgen]
+pub fn pes_scan_internal(
+    input: JsValue,
+    progress_callback: &js_sys::Function,
+) -> Result<JsValue, JsError> {
+    use qc_core::scf::pes_internal;
+
+    // 1. Deserialize input
+    let wasm_input: PesScanInternalWasmInput = serde_wasm_bindgen::from_value(input)
+        .map_err(|e| JsError::new(&format!("Invalid PES scan internal input: {}", e)))?;
+
+    // 2. Validate input
+    if wasm_input.atoms.is_empty() {
+        return Err(JsError::new("pes_scan_internal: atoms array is empty"));
+    }
+
+    let expected_indices = match wasm_input.coordinate_type.as_str() {
+        "bond" => 2,
+        "angle" => 3,
+        "dihedral" => 4,
+        other => {
+            return Err(JsError::new(&format!(
+                "pes_scan_internal: unknown coordinateType '{}', expected 'bond', 'angle', or 'dihedral'",
+                other
+            )));
+        }
+    };
+
+    if wasm_input.atom_indices.len() != expected_indices {
+        return Err(JsError::new(&format!(
+            "pes_scan_internal: coordinateType '{}' requires {} atom indices, got {}",
+            wasm_input.coordinate_type,
+            expected_indices,
+            wasm_input.atom_indices.len()
+        )));
+    }
+
+    let n_atoms = wasm_input.atoms.len();
+    for &idx in &wasm_input.atom_indices {
+        if idx >= n_atoms {
+            return Err(JsError::new(&format!(
+                "pes_scan_internal: atom index {} out of range (molecule has {} atoms)",
+                idx, n_atoms
+            )));
+        }
+    }
+
+    let scan_mode = match wasm_input.scan_mode.as_str() {
+        "rigid" => pes_internal::ScanMode::Rigid,
+        "relaxed" => pes_internal::ScanMode::Relaxed,
+        other => {
+            return Err(JsError::new(&format!(
+                "pes_scan_internal: unknown scanMode '{}', expected 'rigid' or 'relaxed'",
+                other
+            )));
+        }
+    };
+
+    if wasm_input.n_points < 2 {
+        return Err(JsError::new("pes_scan_internal: nPoints must be >= 2"));
+    }
+
+    if wasm_input.value_min >= wasm_input.value_max {
+        return Err(JsError::new(&format!(
+            "pes_scan_internal: valueMin ({}) must be < valueMax ({})",
+            wasm_input.value_min, wasm_input.value_max
+        )));
+    }
+
+    let method_lower = wasm_input.method.to_lowercase();
+    if !["rhf", "hf", "lda", "b3lyp", "b3lyp-d3bj"].contains(&method_lower.as_str()) {
+        return Err(JsError::new(&format!(
+            "pes_scan_internal: unknown method '{}', expected 'rhf', 'lda', 'b3lyp', or 'b3lyp-d3bj'",
+            wasm_input.method
+        )));
+    }
+
+    // 3. Convert atoms from [Z, x, y, z] format to (u8, [f64; 3])
+    let atoms: Vec<(u8, [f64; 3])> = wasm_input
+        .atoms
+        .iter()
+        .map(|a| (a[0] as u8, [a[1], a[2], a[3]]))
+        .collect();
+
+    // 4. Build ScanCoordinate from coordinate_type + atom_indices
+    let coordinate = match wasm_input.coordinate_type.as_str() {
+        "bond" => pes_internal::ScanCoordinate::Bond {
+            atom_i: wasm_input.atom_indices[0],
+            atom_j: wasm_input.atom_indices[1],
+        },
+        "angle" => pes_internal::ScanCoordinate::Angle {
+            atom_i: wasm_input.atom_indices[0],
+            atom_j: wasm_input.atom_indices[1],
+            atom_k: wasm_input.atom_indices[2],
+        },
+        "dihedral" => pes_internal::ScanCoordinate::Dihedral {
+            atom_i: wasm_input.atom_indices[0],
+            atom_j: wasm_input.atom_indices[1],
+            atom_k: wasm_input.atom_indices[2],
+            atom_l: wasm_input.atom_indices[3],
+        },
+        _ => unreachable!(), // Already validated above
+    };
+
+    // 5. Normalize method name (accept "hf" as alias for "rhf")
+    let method = if method_lower == "hf" {
+        "rhf".to_string()
+    } else {
+        method_lower
+    };
+
+    // 6. Build PesScanInternalConfig
+    let config = pes_internal::PesScanInternalConfig {
+        atoms,
+        coordinate,
+        value_min: wasm_input.value_min,
+        value_max: wasm_input.value_max,
+        n_points: wasm_input.n_points,
+        basis_name: wasm_input.basis_name,
+        method,
+        use_seeding: wasm_input.use_seeding,
+        use_spherical: wasm_input.use_spherical,
+        convergence_profile: wasm_input.convergence_profile,
+        opt_max_steps: wasm_input.opt_max_steps,
+        opt_grad_threshold: wasm_input.opt_grad_threshold,
+    };
+
+    // 7. Set up progress callback
+    let n_points = wasm_input.n_points;
+    let progress_fn = |idx: usize, coordinate_value: f64, energy: f64, converged: bool| {
+        let progress = PesScanInternalWasmProgress {
+            point_index: idx,
+            total_points: n_points,
+            coordinate_value,
+            energy,
+            converged,
+            opt_steps: None, // Not available during streaming
+        };
+        if let Ok(js_progress) = serde_wasm_bindgen::to_value(&progress) {
+            let _ = progress_callback.call1(&JsValue::NULL, &js_progress);
+        }
+    };
+
+    // 8. Run internal coordinate PES scan
+    let result = pes_internal::pes_scan_internal(&config, scan_mode, Some(&progress_fn))
+        .map_err(|e| JsError::new(&format!("pes_scan_internal failed: {}", e)))?;
+
+    // 9. Serialize and return result
+    serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+}
+
+// ============================================================================
+// Frequency Analysis — Moved to qc-wasm-spectra
+// ============================================================================
+//
+// The compute_frequencies export and all supporting types
+// (FrequencyWasmInput, FrequencyWasmResult, FrequencyTiming,
+// FrequencyThermochemistry, FrequencySpectrum) have been moved to the
+// `qc-wasm-spectra` crate to enable lazy WASM loading. The spectra module
+// is loaded on demand when the user opens the Frequency tab.
 
 #[cfg(test)]
 mod tests {
@@ -2750,6 +6114,7 @@ mod tests {
             diis_start: 2,
             damp: options.damp.unwrap_or(0.0),
             damp_start: 5,
+            level_shift: 0.0,
         };
 
         let output = qc_core::scf::rhf_scf(&preset_system, &config).unwrap();
@@ -2887,6 +6252,7 @@ mod tests {
             h_core: vec![-1.0, -0.5, -0.5, -1.0],
             fock_matrix: vec![-0.6, -0.3, -0.3, -0.6],
             density_matrix: vec![0.5, 0.2, 0.2, 0.5],
+            mo_coefficients: vec![0.7, 0.7, 0.7, -0.7],
         };
 
         let json = serde_json::to_string(&matrices).unwrap();
@@ -2896,6 +6262,7 @@ mod tests {
         assert!(json.contains("\"sMatrix\":"));
         assert!(json.contains("\"hCore\":"));
         assert!(json.contains("\"fockMatrix\":"));
+        assert!(json.contains("\"moCoefficients\":"));
         assert!(json.contains("\"densityMatrix\":"));
 
         // Verify roundtrip
@@ -2939,6 +6306,7 @@ mod tests {
                 h_core: vec![-1.0, -0.5, -0.5, -1.0],
                 fock_matrix: vec![-0.6, -0.3, -0.3, -0.6],
                 density_matrix: vec![0.5, 0.2, 0.2, 0.5],
+                mo_coefficients: vec![0.7, 0.7, 0.7, -0.7],
             }),
             orbital_energies: Some(ScfWasmOrbitalEnergies {
                 energies: vec![-0.5, 0.5],
@@ -3298,10 +6666,10 @@ mod tests {
 
     #[test]
     fn test_compute_integrals_invalid_element() {
-        // Test that unsupported elements are rejected
+        // Test that unsupported elements are rejected (K = potassium, Z=19)
         let geometry_json = r#"{
             "atoms": [
-                { "symbol": "Na", "xyz": [0.0, 0.0, 0.0] }
+                { "symbol": "K", "xyz": [0.0, 0.0, 0.0] }
             ],
             "units": "bohr"
         }"#;
@@ -3322,6 +6690,215 @@ mod tests {
 
         let geometry: GeometryInput = serde_json::from_str(geometry_json).unwrap();
         assert!(geometry.atoms.is_empty());
+    }
+
+    // ========================================================================
+    // PES Scan WASM Tests (US-039)
+    // ========================================================================
+
+    #[test]
+    fn test_pes_scan_wasm_input_deserialize() {
+        let json = r#"{
+            "atomAZ": 1,
+            "atomBZ": 1,
+            "rMin": 0.5,
+            "rMax": 5.0,
+            "nPoints": 20,
+            "basisName": "sto-3g",
+            "options": {
+                "convergenceProfile": "medium",
+                "maxIterations": 100,
+                "useDiis": true
+            },
+            "useSeeding": true
+        }"#;
+
+        let input: PesScanWasmInput = serde_json::from_str(json).unwrap();
+
+        assert_eq!(input.atom_a_z, 1);
+        assert_eq!(input.atom_b_z, 1);
+        assert_eq!(input.r_min, 0.5);
+        assert_eq!(input.r_max, 5.0);
+        assert_eq!(input.n_points, 20);
+        assert_eq!(input.basis_name, "sto-3g");
+        assert_eq!(input.options.convergence_profile, "medium");
+        assert_eq!(input.options.max_iterations, 100);
+        assert!(input.options.use_diis);
+        assert!(input.use_seeding);
+    }
+
+    #[test]
+    fn test_pes_scan_wasm_input_default_seeding() {
+        // useSeeding should default to true when not specified
+        let json = r#"{
+            "atomAZ": 1,
+            "atomBZ": 1,
+            "rMin": 1.0,
+            "rMax": 3.0,
+            "nPoints": 5,
+            "basisName": "sto-3g",
+            "options": {
+                "convergenceProfile": "loose",
+                "maxIterations": 50,
+                "useDiis": false
+            }
+        }"#;
+
+        let input: PesScanWasmInput = serde_json::from_str(json).unwrap();
+        assert!(input.use_seeding);
+    }
+
+    #[test]
+    fn test_pes_scan_wasm_progress_serialize() {
+        let progress = PesScanWasmProgress {
+            point_index: 3,
+            total_points: 20,
+            r: 1.5,
+            energy: -1.116,
+            converged: true,
+        };
+
+        let json = serde_json::to_string(&progress).unwrap();
+
+        // Verify camelCase field names
+        assert!(json.contains("\"pointIndex\":3"));
+        assert!(json.contains("\"totalPoints\":20"));
+        assert!(json.contains("\"r\":1.5"));
+        assert!(json.contains("\"energy\":-1.116"));
+        assert!(json.contains("\"converged\":true"));
+    }
+
+    #[test]
+    fn test_pes_scan_wasm_input_roundtrip() {
+        let original = PesScanWasmInput {
+            atom_a_z: 1,
+            atom_b_z: 3,
+            r_min: 2.0,
+            r_max: 5.0,
+            n_points: 15,
+            basis_name: "sto-3g".to_string(),
+            options: ScfWasmOptions {
+                convergence_profile: "tight".to_string(),
+                max_iterations: 100,
+                use_diis: true,
+                diis_size: Some(8),
+                damp: None,
+                include_matrices: false,
+            },
+            use_seeding: true,
+        };
+
+        let json = serde_json::to_string(&original).unwrap();
+        let recovered: PesScanWasmInput = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(original.atom_a_z, recovered.atom_a_z);
+        assert_eq!(original.atom_b_z, recovered.atom_b_z);
+        assert_eq!(original.r_min, recovered.r_min);
+        assert_eq!(original.r_max, recovered.r_max);
+        assert_eq!(original.n_points, recovered.n_points);
+        assert_eq!(original.basis_name, recovered.basis_name);
+        assert_eq!(original.use_seeding, recovered.use_seeding);
+    }
+
+    #[test]
+    fn test_pes_point_serialize() {
+        use qc_core::scf::pes::PesPoint;
+
+        let point = PesPoint {
+            r: 1.4,
+            energy: -1.116714,
+            converged: true,
+            iterations: 8,
+        };
+
+        let json = serde_json::to_string(&point).unwrap();
+
+        // PesPoint uses default serde (no rename_all) -- Rust field names
+        assert!(json.contains("\"r\":1.4"));
+        assert!(json.contains("\"energy\":-1.116714"));
+        assert!(json.contains("\"converged\":true"));
+        assert!(json.contains("\"iterations\":8"));
+    }
+
+    #[test]
+    fn test_pes_equilibrium_serialize() {
+        use qc_core::scf::pes::PesEquilibrium;
+
+        let eq = PesEquilibrium {
+            r_bohr: 1.346,
+            energy_hartree: -1.116714,
+        };
+
+        let json = serde_json::to_string(&eq).unwrap();
+
+        assert!(json.contains("\"r_bohr\":1.346"));
+        assert!(json.contains("\"energy_hartree\":-1.116714"));
+    }
+
+    #[test]
+    fn test_pes_scan_result_serialize() {
+        use qc_core::scf::pes::{PesEquilibrium, PesPoint, PesScanResult};
+
+        let result = PesScanResult {
+            points: vec![
+                PesPoint {
+                    r: 1.0,
+                    energy: -1.0,
+                    converged: true,
+                    iterations: 5,
+                },
+                PesPoint {
+                    r: 2.0,
+                    energy: -1.5,
+                    converged: true,
+                    iterations: 4,
+                },
+            ],
+            equilibrium: Some(PesEquilibrium {
+                r_bohr: 1.5,
+                energy_hartree: -1.3,
+            }),
+            compute_time_ms: 150.0,
+            total_iterations: 9,
+        };
+
+        let json = serde_json::to_string(&result).unwrap();
+
+        assert!(json.contains("\"points\":["));
+        assert!(json.contains("\"equilibrium\":{"));
+        assert!(json.contains("\"compute_time_ms\":150.0"));
+        assert!(json.contains("\"total_iterations\":9"));
+    }
+
+    #[test]
+    fn test_pes_scan_result_roundtrip() {
+        use qc_core::scf::pes::{PesEquilibrium, PesPoint, PesScanResult};
+
+        let original = PesScanResult {
+            points: vec![PesPoint {
+                r: 1.4,
+                energy: -1.116714,
+                converged: true,
+                iterations: 8,
+            }],
+            equilibrium: Some(PesEquilibrium {
+                r_bohr: 1.346,
+                energy_hartree: -1.116714,
+            }),
+            compute_time_ms: 200.0,
+            total_iterations: 8,
+        };
+
+        let json = serde_json::to_string(&original).unwrap();
+        let recovered: PesScanResult = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(original.points.len(), recovered.points.len());
+        assert_eq!(original.points[0].r, recovered.points[0].r);
+        assert_eq!(original.points[0].energy, recovered.points[0].energy);
+        assert!(recovered.equilibrium.is_some());
+        let eq = recovered.equilibrium.unwrap();
+        assert_eq!(eq.r_bohr, 1.346);
+        assert_eq!(eq.energy_hartree, -1.116714);
     }
 
     #[test]
@@ -3381,5 +6958,456 @@ mod tests {
         assert!(json.contains("\"sMatrix\":"));
         assert!(json.contains("\"hCore\":"));
         assert!(json.contains("\"eriCompressed\":"));
+    }
+
+    // ========================================================================
+    // Integral Matrices (US-055) Tests
+    // ========================================================================
+
+    #[test]
+    fn test_generate_basis_labels_h2_sto3g() {
+        use qc_core::basis::{Atom, BasisSet};
+
+        let atoms = vec![
+            Atom::new(1, [0.0, 0.0, 0.0]).unwrap(),
+            Atom::new(1, [0.0, 0.0, 1.3984]).unwrap(),
+        ];
+        let basis = BasisSet::build(atoms, "sto-3g").unwrap();
+        let labels = generate_basis_labels(&basis, false);
+
+        assert_eq!(labels.len(), 2);
+        assert_eq!(labels[0], "H1 1s");
+        assert_eq!(labels[1], "H2 1s");
+    }
+
+    #[test]
+    fn test_generate_basis_labels_h2o_sto3g() {
+        use qc_core::basis::{Atom, BasisSet};
+
+        let atoms = vec![
+            Atom::new(8, [0.0, 0.0, 0.117]).unwrap(),
+            Atom::new(1, [0.0, 1.43, -0.47]).unwrap(),
+            Atom::new(1, [0.0, -1.43, -0.47]).unwrap(),
+        ];
+        let basis = BasisSet::build(atoms, "sto-3g").unwrap();
+        let labels = generate_basis_labels(&basis, false);
+
+        assert_eq!(labels.len(), 7);
+        assert_eq!(labels[0], "O 1s");
+        assert_eq!(labels[1], "O 2s");
+        assert_eq!(labels[2], "O 2px");
+        assert_eq!(labels[3], "O 2py");
+        assert_eq!(labels[4], "O 2pz");
+        assert_eq!(labels[5], "H1 1s");
+        assert_eq!(labels[6], "H2 1s");
+    }
+
+    #[test]
+    fn test_generate_basis_labels_lih_sto3g() {
+        use qc_core::basis::{Atom, BasisSet};
+
+        let atoms = vec![
+            Atom::new(3, [0.0, 0.0, 0.0]).unwrap(),
+            Atom::new(1, [0.0, 0.0, 3.015]).unwrap(),
+        ];
+        let basis = BasisSet::build(atoms, "sto-3g").unwrap();
+        let labels = generate_basis_labels(&basis, false);
+
+        assert_eq!(labels.len(), 6);
+        assert_eq!(labels[0], "Li 1s");
+        assert_eq!(labels[1], "Li 2s");
+        assert_eq!(labels[2], "Li 2px");
+        assert_eq!(labels[3], "Li 2py");
+        assert_eq!(labels[4], "Li 2pz");
+        assert_eq!(labels[5], "H 1s");
+    }
+
+    #[test]
+    fn test_generate_basis_labels_single_atom_no_numbering() {
+        use qc_core::basis::{Atom, BasisSet};
+
+        // Single H atom - should not have numbering
+        let atoms = vec![Atom::new(1, [0.0, 0.0, 0.0]).unwrap()];
+        let basis = BasisSet::build(atoms, "sto-3g").unwrap();
+        let labels = generate_basis_labels(&basis, false);
+
+        assert_eq!(labels.len(), 1);
+        assert_eq!(labels[0], "H 1s");
+    }
+
+    #[test]
+    fn test_generate_basis_labels_h2o_631gs_cartesian() {
+        use qc_core::basis::{Atom, BasisSet};
+
+        let atoms = vec![
+            Atom::new(8, [0.0, 0.0, 0.117]).unwrap(),
+            Atom::new(1, [0.0, 1.43, -0.47]).unwrap(),
+            Atom::new(1, [0.0, -1.43, -0.47]).unwrap(),
+        ];
+        let basis = BasisSet::build(atoms, "6-31g*").unwrap();
+        let labels = generate_basis_labels(&basis, false);
+
+        // 6-31G* on O: 1s, 2s, 2p(3), 3s, 3p(3), 3d(6) = 15
+        // 6-31G on H: 1s, 2s = 2 each, total 4
+        // Total: 19
+        assert_eq!(labels.len(), 19);
+        assert_eq!(basis.n_basis, 19);
+
+        // Check d-shell labels are Cartesian
+        assert!(labels.iter().any(|l| l.contains("dxx")));
+        assert!(labels.iter().any(|l| l.contains("dyz")));
+    }
+
+    #[test]
+    fn test_generate_basis_labels_h2o_631gs_spherical() {
+        use qc_core::basis::{Atom, BasisSet};
+
+        let atoms = vec![
+            Atom::new(8, [0.0, 0.0, 0.117]).unwrap(),
+            Atom::new(1, [0.0, 1.43, -0.47]).unwrap(),
+            Atom::new(1, [0.0, -1.43, -0.47]).unwrap(),
+        ];
+        let basis = BasisSet::build(atoms, "6-31g*").unwrap();
+        let labels = generate_basis_labels(&basis, true);
+
+        // Spherical: 6-31G* on O: 1s, 2s, 2p(3), 3s, 3p(3), 3d(5) = 14
+        // 6-31G on H: 1s, 2s = 2 each, total 4
+        // Total: 18
+        assert_eq!(labels.len(), 18);
+        assert_eq!(basis.n_basis_spherical(), 18);
+
+        // Check d-shell labels are spherical
+        assert!(labels.iter().any(|l| l.contains("d-2")));
+        assert!(labels.iter().any(|l| l.contains("d+2")));
+    }
+
+    #[test]
+    fn test_integral_matrices_output_serialization() {
+        let output = IntegralMatricesOutput {
+            nbf: 2,
+            labels: vec!["H1 1s".to_string(), "H2 1s".to_string()],
+            s_matrix: vec![1.0, 0.659, 0.659, 1.0],
+            t_matrix: vec![0.76, 0.24, 0.24, 0.76],
+            v_matrix: vec![-1.88, -1.20, -1.20, -1.88],
+            h_core: vec![-1.12, -0.96, -0.96, -1.12],
+            nuclear_repulsion: 0.7151043,
+            compute_time_ms: 1.5,
+        };
+
+        let json = serde_json::to_string(&output).unwrap();
+
+        // Verify camelCase serialization
+        assert!(json.contains("\"nbf\":2"));
+        assert!(json.contains("\"labels\":[\"H1 1s\",\"H2 1s\"]"));
+        assert!(json.contains("\"sMatrix\":"));
+        assert!(json.contains("\"tMatrix\":"));
+        assert!(json.contains("\"vMatrix\":"));
+        assert!(json.contains("\"hCore\":"));
+        assert!(json.contains("\"nuclearRepulsion\":"));
+        assert!(json.contains("\"computeTimeMs\":"));
+    }
+
+    #[test]
+    fn test_integral_matrices_input_deserialization() {
+        let json = r#"{
+            "atoms": [
+                {"symbol": "H", "xyz": [0, 0, 0]},
+                {"symbol": "H", "xyz": [0, 0, 1.4]}
+            ],
+            "basisName": "sto-3g",
+            "units": "bohr"
+        }"#;
+
+        let input: IntegralMatricesInput = serde_json::from_str(json).unwrap();
+        assert_eq!(input.atoms.len(), 2);
+        assert_eq!(input.basis_name, "sto-3g");
+        assert_eq!(input.units, "bohr");
+        assert!(!input.use_spherical);
+    }
+
+    #[test]
+    fn test_integral_matrices_input_defaults() {
+        // units should default to "bohr", use_spherical to false
+        let json = r#"{
+            "atoms": [{"symbol": "H", "xyz": [0, 0, 0]}],
+            "basisName": "sto-3g"
+        }"#;
+
+        let input: IntegralMatricesInput = serde_json::from_str(json).unwrap();
+        assert_eq!(input.units, "bohr");
+        assert!(!input.use_spherical);
+    }
+
+    #[test]
+    fn test_density_grid_input_deserialization() {
+        let json = r#"{
+            "densityMatrix": [0.6, 0.4, 0.4, 0.6],
+            "atoms": [[1, 0, 0, 0], [1, 0, 0, 1.4]],
+            "basisName": "sto-3g",
+            "gridOrigin": [-5.0, -5.0, -5.0],
+            "gridSpacing": 0.5,
+            "gridDims": [21, 21, 23],
+            "nElectrons": 2
+        }"#;
+
+        let input: DensityGridWasmInput = serde_json::from_str(json).unwrap();
+        assert_eq!(input.density_matrix.len(), 4);
+        assert_eq!(input.atoms.len(), 2);
+        assert_eq!(input.basis_name, "sto-3g");
+        assert_eq!(input.grid_dims, [21, 21, 23]);
+        assert_eq!(input.n_electrons, 2);
+        assert!(!input.use_spherical); // default
+    }
+
+    #[test]
+    fn test_density_grid_input_with_spherical() {
+        let json = r#"{
+            "densityMatrix": [0.6, 0.4, 0.4, 0.6],
+            "atoms": [[1, 0, 0, 0], [1, 0, 0, 1.4]],
+            "basisName": "sto-3g",
+            "gridOrigin": [-5.0, -5.0, -5.0],
+            "gridSpacing": 0.5,
+            "gridDims": [21, 21, 23],
+            "nElectrons": 2,
+            "useSpherical": true
+        }"#;
+
+        let input: DensityGridWasmInput = serde_json::from_str(json).unwrap();
+        assert!(input.use_spherical);
+    }
+
+    #[test]
+    fn test_density_grid_result_serialization() {
+        let result = DensityGridResult {
+            values: vec![0.1, 0.2, 0.3],
+            grid_origin: [-5.0, -5.0, -5.0],
+            grid_spacing: 0.5,
+            grid_dims: [21, 21, 23],
+            integrated_density: 1.98,
+            n_electrons_expected: 2,
+            max_density: 0.3,
+            compute_time_ms: 42.5,
+        };
+
+        let json = serde_json::to_string(&result).unwrap();
+
+        // Verify camelCase field names
+        assert!(json.contains("\"integratedDensity\""));
+        assert!(json.contains("\"nElectronsExpected\":2"));
+        assert!(json.contains("\"maxDensity\""));
+        assert!(json.contains("\"computeTimeMs\""));
+        assert!(json.contains("\"gridOrigin\""));
+        assert!(json.contains("\"gridSpacing\""));
+        assert!(json.contains("\"gridDims\""));
+
+        // Roundtrip
+        let recovered: DensityGridResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(recovered.values.len(), 3);
+        assert_eq!(recovered.n_electrons_expected, 2);
+        assert!((recovered.integrated_density - 1.98).abs() < 1e-10);
+    }
+
+    // ========================================================================
+    // Difference Density (US-063) Tests
+    // ========================================================================
+
+    #[test]
+    fn test_difference_density_input_deserialization() {
+        let json = r#"{
+            "totalDensity": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+            "atoms": [[1, 0, 0, 0], [1, 0, 0, 1.4]],
+            "gridOrigin": [-5.0, -5.0, -5.0],
+            "gridSpacing": 0.5,
+            "gridDims": [2, 2, 2]
+        }"#;
+
+        let input: DifferenceDensityWasmInput = serde_json::from_str(json).unwrap();
+        assert_eq!(input.total_density.len(), 8);
+        assert_eq!(input.atoms.len(), 2);
+        assert_eq!(input.grid_dims, [2, 2, 2]);
+        assert!((input.grid_spacing - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_difference_density_result_serialization() {
+        let result = DifferenceDensityWasmResult {
+            values: vec![0.01, -0.02, 0.03],
+            grid_origin: [-5.0, -5.0, -5.0],
+            grid_spacing: 0.5,
+            grid_dims: [1, 1, 3],
+            integrated_delta_rho: 0.001,
+            max_accumulation: 0.03,
+            max_depletion: -0.02,
+            compute_time_ms: 15.0,
+        };
+
+        let json = serde_json::to_string(&result).unwrap();
+
+        // Verify camelCase field names
+        assert!(json.contains("\"integratedDeltaRho\""));
+        assert!(json.contains("\"maxAccumulation\""));
+        assert!(json.contains("\"maxDepletion\""));
+        assert!(json.contains("\"computeTimeMs\""));
+        assert!(json.contains("\"gridOrigin\""));
+        assert!(json.contains("\"gridSpacing\""));
+        assert!(json.contains("\"gridDims\""));
+
+        // Roundtrip
+        let recovered: DifferenceDensityWasmResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(recovered.values.len(), 3);
+        assert!((recovered.integrated_delta_rho - 0.001).abs() < 1e-10);
+        assert!((recovered.max_accumulation - 0.03).abs() < 1e-10);
+        assert!((recovered.max_depletion - (-0.02)).abs() < 1e-10);
+    }
+
+    // ========================================================================
+    // Internal Coordinate PES Scan WASM Tests (US-081)
+    // ========================================================================
+
+    #[test]
+    fn test_pes_scan_internal_input_deserialize_bond() {
+        let json = r#"{
+            "atoms": [[1, 0, 0, 0], [1, 0, 0, 1.4]],
+            "basisName": "sto-3g",
+            "method": "rhf",
+            "coordinateType": "bond",
+            "atomIndices": [0, 1],
+            "scanMode": "rigid",
+            "valueMin": 0.5,
+            "valueMax": 5.0,
+            "nPoints": 20
+        }"#;
+
+        let input: PesScanInternalWasmInput = serde_json::from_str(json).unwrap();
+        assert_eq!(input.atoms.len(), 2);
+        assert_eq!(input.basis_name, "sto-3g");
+        assert_eq!(input.method, "rhf");
+        assert_eq!(input.coordinate_type, "bond");
+        assert_eq!(input.atom_indices, vec![0, 1]);
+        assert_eq!(input.scan_mode, "rigid");
+        assert!((input.value_min - 0.5).abs() < 1e-10);
+        assert!((input.value_max - 5.0).abs() < 1e-10);
+        assert_eq!(input.n_points, 20);
+        // Check defaults
+        assert!(input.use_seeding);
+        assert!(input.use_spherical);
+        assert_eq!(input.convergence_profile, "tight");
+    }
+
+    #[test]
+    fn test_pes_scan_internal_input_deserialize_angle() {
+        let json = r#"{
+            "atoms": [[8, 0, 0, 0], [1, 0.96, 0, 0], [1, -0.24, 0.93, 0]],
+            "basisName": "6-31g*",
+            "method": "b3lyp",
+            "coordinateType": "angle",
+            "atomIndices": [1, 0, 2],
+            "scanMode": "relaxed",
+            "valueMin": 1.5,
+            "valueMax": 2.5,
+            "nPoints": 10,
+            "useSeeding": false,
+            "useSpherical": false,
+            "convergenceProfile": "medium"
+        }"#;
+
+        let input: PesScanInternalWasmInput = serde_json::from_str(json).unwrap();
+        assert_eq!(input.atoms.len(), 3);
+        assert_eq!(input.coordinate_type, "angle");
+        assert_eq!(input.atom_indices, vec![1, 0, 2]);
+        assert_eq!(input.scan_mode, "relaxed");
+        assert!(!input.use_seeding);
+        assert!(!input.use_spherical);
+        assert_eq!(input.convergence_profile, "medium");
+    }
+
+    #[test]
+    fn test_pes_scan_internal_input_deserialize_dihedral() {
+        let json = r#"{
+            "atoms": [[1, 0, 0, 0], [6, 1.0, 0, 0], [6, 2.0, 1.0, 0], [1, 3.0, 1.0, 0]],
+            "basisName": "sto-3g",
+            "method": "b3lyp-d3bj",
+            "coordinateType": "dihedral",
+            "atomIndices": [0, 1, 2, 3],
+            "scanMode": "rigid",
+            "valueMin": -3.14159,
+            "valueMax": 3.14159,
+            "nPoints": 36
+        }"#;
+
+        let input: PesScanInternalWasmInput = serde_json::from_str(json).unwrap();
+        assert_eq!(input.coordinate_type, "dihedral");
+        assert_eq!(input.atom_indices.len(), 4);
+        assert_eq!(input.method, "b3lyp-d3bj");
+        assert_eq!(input.n_points, 36);
+    }
+
+    #[test]
+    fn test_pes_scan_internal_input_roundtrip() {
+        let input = PesScanInternalWasmInput {
+            atoms: vec![[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 1.4]],
+            basis_name: "sto-3g".to_string(),
+            method: "rhf".to_string(),
+            coordinate_type: "bond".to_string(),
+            atom_indices: vec![0, 1],
+            scan_mode: "rigid".to_string(),
+            value_min: 0.5,
+            value_max: 5.0,
+            n_points: 20,
+            use_seeding: true,
+            use_spherical: true,
+            convergence_profile: "tight".to_string(),
+            opt_max_steps: None,
+            opt_grad_threshold: None,
+        };
+
+        let json = serde_json::to_string(&input).unwrap();
+
+        // Verify camelCase field names
+        assert!(json.contains("\"basisName\""));
+        assert!(json.contains("\"coordinateType\""));
+        assert!(json.contains("\"atomIndices\""));
+        assert!(json.contains("\"scanMode\""));
+        assert!(json.contains("\"valueMin\""));
+        assert!(json.contains("\"valueMax\""));
+        assert!(json.contains("\"nPoints\""));
+        assert!(json.contains("\"useSeeding\""));
+        assert!(json.contains("\"useSpherical\""));
+        assert!(json.contains("\"convergenceProfile\""));
+
+        // Roundtrip
+        let recovered: PesScanInternalWasmInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(recovered.atoms.len(), 2);
+        assert_eq!(recovered.basis_name, "sto-3g");
+        assert_eq!(recovered.coordinate_type, "bond");
+        assert_eq!(recovered.n_points, 20);
+    }
+
+    #[test]
+    fn test_pes_scan_internal_progress_serializes_camel_case() {
+        let progress = PesScanInternalWasmProgress {
+            point_index: 3,
+            total_points: 20,
+            coordinate_value: 1.5,
+            energy: -1.116714,
+            converged: true,
+            opt_steps: None,
+        };
+
+        let json = serde_json::to_string(&progress).unwrap();
+
+        // Verify camelCase field names
+        assert!(json.contains("\"pointIndex\":3"));
+        assert!(json.contains("\"totalPoints\":20"));
+        assert!(json.contains("\"coordinateValue\""));
+        assert!(json.contains("\"optSteps\":null"));
+
+        // With opt_steps set (relaxed scan)
+        let progress_relaxed = PesScanInternalWasmProgress {
+            opt_steps: Some(12),
+            ..progress
+        };
+        let json_relaxed = serde_json::to_string(&progress_relaxed).unwrap();
+        assert!(json_relaxed.contains("\"optSteps\":12"));
     }
 }

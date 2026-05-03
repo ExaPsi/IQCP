@@ -1,0 +1,150 @@
+{
+  "generated": "2026-04-15T11:30:00",
+  "method_note": "L\u00f6wdin charges = Z_nuc - sum(diag(S^(1/2) D S^(1/2))) per atom; Mulliken charges via PySCF mulliken_pop().",
+  "results": [
+    {
+      "molecule": "H2",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "atoms": [
+        "H",
+        "H"
+      ],
+      "mulliken_charges": [
+        -2.220446049250313e-16,
+        2.220446049250313e-16
+      ],
+      "lowdin_charges": [
+        2.220446049250313e-16,
+        5.551115123125783e-16
+      ],
+      "lowdin_populations_per_atom": [
+        0.9999999999999998,
+        0.9999999999999994
+      ],
+      "charge_sum_check": 7.771561172376096e-16
+    },
+    {
+      "molecule": "H2",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "atoms": [
+        "H",
+        "H"
+      ],
+      "mulliken_charges": [
+        -2.220446049250313e-16,
+        2.220446049250313e-16
+      ],
+      "lowdin_charges": [
+        2.220446049250313e-16,
+        5.551115123125783e-16
+      ],
+      "lowdin_populations_per_atom": [
+        0.9999999999999998,
+        0.9999999999999994
+      ],
+      "charge_sum_check": 7.771561172376096e-16
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "atoms": [
+        "H",
+        "H"
+      ],
+      "mulliken_charges": [
+        -6.661338147750939e-16,
+        8.881784197001252e-16
+      ],
+      "lowdin_charges": [
+        -5.10702591327572e-15,
+        -3.774758283725532e-15
+      ],
+      "lowdin_populations_per_atom": [
+        1.000000000000005,
+        1.0000000000000038
+      ],
+      "charge_sum_check": -8.881784197001252e-15
+    },
+    {
+      "molecule": "H2O",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "atoms": [
+        "O",
+        "H",
+        "H"
+      ],
+      "mulliken_charges": [
+        -0.3656482502622058,
+        0.1828241251311049,
+        0.1828241251311047
+      ],
+      "lowdin_charges": [
+        -0.252951580613173,
+        0.12647579030658262,
+        0.12647579030658274
+      ],
+      "lowdin_populations_per_atom": [
+        8.252951580613173,
+        0.8735242096934174,
+        0.8735242096934173
+      ],
+      "charge_sum_check": -7.66053886991358e-15
+    },
+    {
+      "molecule": "H2O",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "atoms": [
+        "O",
+        "H",
+        "H"
+      ],
+      "mulliken_charges": [
+        -0.3675719823855612,
+        0.18378599119277994,
+        0.18378599119277872
+      ],
+      "lowdin_charges": [
+        -0.25318192141523355,
+        0.1265909607076089,
+        0.1265909607076081
+      ],
+      "lowdin_populations_per_atom": [
+        8.253181921415234,
+        0.8734090392923911,
+        0.8734090392923919
+      ],
+      "charge_sum_check": -1.6542323066914832e-14
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "atoms": [
+        "O",
+        "H",
+        "H"
+      ],
+      "mulliken_charges": [
+        -0.8661271872547722,
+        0.4330635936273892,
+        0.4330635936273872
+      ],
+      "lowdin_charges": [
+        -0.7831516086791961,
+        0.3915758043396037,
+        0.39157580433960226
+      ],
+      "lowdin_populations_per_atom": [
+        8.783151608679196,
+        0.6084241956603963,
+        0.6084241956603977
+      ],
+      "charge_sum_check": 9.880984919163893e-15
+    }
+  ]
+}

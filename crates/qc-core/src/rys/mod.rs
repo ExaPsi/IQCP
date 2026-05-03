@@ -15,8 +15,11 @@
 //!
 //! # Constraints
 //!
-//! - Roots must lie in open interval (0, 1)
-//! - Weights must be strictly positive
+//! - Roots must lie in the interval [0, 1). In generic non-degenerate cases all
+//!   roots are strictly positive, but root = 0 can occur legitimately when
+//!   T = 0 or moments are near-zero (degenerate limit). See the `validate`
+//!   method on `RysResult` for the enforced bounds.
+//! - Weights must be non-negative (strictly positive for non-degenerate cases)
 //! - Moment reconstruction accuracy: 1e-10
 //!
 //! # Reference
@@ -62,6 +65,14 @@ const QR_EPSILON: f64 = 1e-15;
 /// Reference: libcint find_roots.c line 66: if (n > 200)
 const BISECTION_MAX_ITERATIONS: usize = 200;
 
+// Stack-allocation sizes derived from MAX_ROOTS:
+// - Moments: 2*MAX_ROOTS + 1 values (F_0 through F_{2*MAX_ROOTS})
+const MAX_MOMENTS: usize = 2 * MAX_ROOTS + 1;
+// - Coefficient matrix cs: (MAX_ROOTS+1)^2 in column-major
+const MAX_CS_SIZE: usize = (MAX_ROOTS + 1) * (MAX_ROOTS + 1);
+// - Companion matrix a: MAX_ROOTS^2
+const MAX_A_SIZE: usize = MAX_ROOTS * MAX_ROOTS;
+
 // =============================================================================
 // Error types
 // =============================================================================
@@ -93,8 +104,8 @@ pub enum RysError {
     #[error("Polynomial root finding failed: {0}")]
     RootFindingFailed(String),
 
-    /// Root is outside valid range (0, 1)
-    #[error("Root {0} = {1} is outside valid range (0, 1)")]
+    /// Root is outside valid range [0, 1)
+    #[error("Root {0} = {1} is outside valid range [0, 1)")]
     RootOutOfRange(usize, f64),
 
     /// Weight is not positive
@@ -138,8 +149,12 @@ impl std::fmt::Display for RysMethod {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RysResult {
-    /// Quadrature roots in the interval (0, 1)
-    /// These are the actual quadrature points, NOT the transformed u/(1-u) values
+    /// Quadrature roots in the interval [0, 1).
+    ///
+    /// In non-degenerate cases all roots are strictly in (0, 1), but root = 0
+    /// can occur for degenerate inputs (T = 0, near-zero moments, or when a
+    /// companion-matrix eigenvalue lands at exactly 1.0 and is reset).
+    /// These are the actual quadrature points, NOT the transformed u/(1-u) values.
     pub roots: Vec<f64>,
 
     /// Quadrature weights (all strictly positive)
@@ -168,10 +183,13 @@ impl RysResult {
         }
     }
 
-    /// Validate that all roots are in (0, 1) and all weights are positive
+    /// Validate that all roots are in [0, 1) and all weights are non-negative.
+    ///
+    /// Root = 0 is permitted for degenerate cases (T = 0, near-zero moments,
+    /// or when a root at 1.0 is clamped to 0.0 following libcint convention).
     fn validate(&self) -> Result<(), RysError> {
         for (i, &root) in self.roots.iter().enumerate() {
-            // Allow root = 0 for degenerate cases (T very large)
+            // Range [0, 1): root = 0 is valid in degenerate limits
             if !(0.0..1.0).contains(&root) {
                 return Err(RysError::RootOutOfRange(i, root));
             }
@@ -223,7 +241,7 @@ impl RysResult {
 ///
 /// let result = rys_roots(3, 1.0).unwrap();
 /// assert_eq!(result.nroots, 3);
-/// assert!(result.roots.iter().all(|&r| r > 0.0 && r < 1.0));
+/// assert!(result.roots.iter().all(|&r| r >= 0.0 && r < 1.0));
 /// assert!(result.weights.iter().all(|&w| w > 0.0));
 /// assert_eq!(result.method, RysMethod::Standard);
 /// ```
@@ -250,10 +268,14 @@ pub fn rys_roots(nroots: usize, t: f64) -> Result<RysResult, RysError> {
     let boys_results = boys_eval_all(m_max as u32, t)
         .map_err(|e| RysError::BoysEvaluationFailed(e.to_string()))?;
 
-    let moments: Vec<f64> = boys_results.iter().map(|r| r.value).collect();
+    // Stack-allocated moments array (avoids heap allocation per call)
+    let mut moments = [0.0f64; MAX_MOMENTS];
+    for (i, r) in boys_results.iter().enumerate() {
+        moments[i] = r.value;
+    }
 
     // Call internal RDK algorithm
-    rdk_rys_roots(nroots, &moments, t)
+    rdk_rys_roots(nroots, &moments[..m_max + 1], t)
 }
 
 /// Compute Rys quadrature for multiple T values efficiently.
@@ -371,8 +393,8 @@ pub struct ErrorCurveResult {
 ///     assert!(point.max_error >= 0.0);
 /// }
 ///
-/// // Low-order quadrature should achieve very high accuracy
-/// assert!(result.points[0].max_error < 1e-14);
+/// // Highest order should be very accurate (integrates full moment set exactly)
+/// assert!(result.points[4].max_error < 1e-10);
 /// ```
 ///
 /// # Numerical Notes
@@ -408,13 +430,14 @@ pub fn error_curve(n_max: usize, t: f64) -> Result<ErrorCurveResult, RysError> {
     for n in 1..=n_max {
         let rys_result = rys_roots(n, t)?;
 
-        // Compute max reconstruction error across moments 0..2n-1
-        // n-point Gauss quadrature should exactly integrate polynomials up to degree 2n-1
+        // Compute max reconstruction error across the FIXED moment set 0..m_max.
+        // Using the same moment range for all orders makes the order-accuracy tradeoff
+        // pedagogically meaningful: students see that n-point quadrature is exact for
+        // moments 0..2n-1 but accumulates error on higher moments up to m_max.
         // Reference: Dupuis, Rys & King (1976), Gauss quadrature exactness property
         let mut max_error = 0.0f64;
-        let m_upper = 2 * n - 1; // Test moments that should be exact for n-point quadrature
 
-        for (m, &moment) in moments.iter().enumerate().take(m_upper + 1) {
+        for (m, &moment) in moments.iter().enumerate().take(m_max + 1) {
             // Compute quadrature sum: Σ_k w_k * r_k^m
             let quadrature_sum: f64 = rys_result
                 .roots
@@ -481,26 +504,29 @@ fn rdk_rys_roots(nroots: usize, moments: &[f64], t: f64) -> Result<RysResult, Ry
 
     // Build orthogonal polynomial coefficients via Schmidt orthogonalization
     // cs is stored in column-major order: cs[i + j * nroots1] = cs[i,j]
-    let mut cs = vec![0.0; nroots1 * nroots1];
-    schmidt_orthogonalize(&mut cs, moments, nroots1)?;
+    // Stack-allocated: MAX_CS_SIZE = (MAX_ROOTS+1)^2 = 121 f64 = 968 bytes
+    let mut cs = [0.0f64; MAX_CS_SIZE];
+    schmidt_orthogonalize(&mut cs[..nroots1 * nroots1], moments, nroots1)?;
 
     // Find roots of the highest-order orthogonal polynomial
     // Reference: libcint rys_roots.c line 1727
-    let mut roots = vec![0.0; nroots];
-    polynomial_roots(&mut roots, &cs, nroots, nroots1)?;
+    // Stack-allocated: MAX_ROOTS = 10 f64 = 80 bytes
+    let mut roots_buf = [0.0f64; MAX_ROOTS];
+    polynomial_roots(&mut roots_buf[..nroots], &cs, nroots, nroots1)?;
 
     // Compute weights from polynomial values at roots
     // Reference: libcint rys_roots.c lines 1732-1754
-    let mut weights = vec![0.0; nroots];
+    // Stack-allocated: MAX_ROOTS = 10 f64 = 80 bytes
+    let mut weights_buf = [0.0f64; MAX_ROOTS];
 
     for k in 0..nroots {
-        let root = roots[k];
+        let root = roots_buf[k];
 
         // Handle degenerate case where root = 1
         // Reference: libcint rys_roots.c lines 1738-1741
         if (root - 1.0).abs() < THRESHOLD_ZERO {
-            roots[k] = 0.0;
-            weights[k] = 0.0;
+            roots_buf[k] = 0.0;
+            weights_buf[k] = 0.0;
             continue;
         }
 
@@ -518,10 +544,16 @@ fn rdk_rys_roots(nroots: usize, moments: &[f64], t: f64) -> Result<RysResult, Ry
         // Note: libcint stores roots[k] = root / (1 - root), which is u/(1-u)
         // For IQCP, we want the actual quadrature point u in (0, 1)
         // The libcint root is already in the form we need (it's u, not u/(1-u))
-        weights[k] = 1.0 / dum;
+        weights_buf[k] = 1.0 / dum;
     }
 
-    let result = RysResult::new(roots, weights, t, RysMethod::Standard);
+    // Copy from stack buffers to Vec for the public API (RysResult)
+    let result = RysResult::new(
+        roots_buf[..nroots].to_vec(),
+        weights_buf[..nroots].to_vec(),
+        t,
+        RysMethod::Standard,
+    );
     result.validate()?;
     Ok(result)
 }
@@ -551,8 +583,9 @@ fn rdk_rys_roots(nroots: usize, moments: &[f64], t: f64) -> Result<RysResult, Ry
 ///
 /// Reference: libcint rys_roots.c lines 1643-1693
 fn schmidt_orthogonalize(cs: &mut [f64], moments: &[f64], n: usize) -> Result<(), RysError> {
-    // Initialize workspace for Gram-Schmidt
-    let mut v = vec![0.0; n];
+    // Initialize workspace for Gram-Schmidt (stack-allocated)
+    // n = nroots+1 <= MAX_ROOTS+1 = 11
+    let mut v = [0.0f64; MAX_ROOTS + 1];
 
     // First polynomial: P_0(x) = 1/sqrt(mu_0)
     // Reference: libcint rys_roots.c line 1657
@@ -691,10 +724,11 @@ fn polynomial_roots(
     // General case: Build companion matrix and apply QR
     // Reference: libcint find_roots.c lines 255-273
 
-    // Build companion matrix A
+    // Build companion matrix A (stack-allocated)
     // A[nroots-1-i, 0] = -cs[nroots, i] / cs[nroots, nroots]
     // A[i+1, i] = 1 (subdiagonal)
-    let mut a_matrix = vec![0.0; nroots * nroots];
+    // MAX_A_SIZE = MAX_ROOTS^2 = 100 f64 = 800 bytes
+    let mut a_matrix = [0.0f64; MAX_A_SIZE];
 
     // Get the leading coefficient for normalization
     let nroots_n1 = nroots * nroots1;
@@ -1428,28 +1462,35 @@ mod tests {
                 assert!(point.max_error >= 0.0, "Error must be non-negative");
                 assert!(point.max_error.is_finite(), "Error must be finite");
 
-                // Errors should be bounded - not catastrophically large
-                // Even with numerical issues, errors should be < 1e-3 for well-conditioned problems
+                // With the fixed moment set (0..2*n_max-1 = 0..19), low-order
+                // quadrature has significant error on higher moments it cannot
+                // integrate. All errors should still be bounded below 1.0.
                 assert!(
-                    point.max_error < 1e-3,
-                    "Error {} at T={}, n={} exceeds bound 1e-3",
+                    point.max_error < 1.0,
+                    "Error {} at T={}, n={} exceeds bound 1.0",
                     point.max_error,
                     t,
                     point.n
                 );
             }
 
-            // Low-order quadrature (n=1,2,3) should be very accurate (< 1e-14)
-            // because the computations are simpler and more numerically stable
-            for i in 0..3.min(result.points.len()) {
-                assert!(
-                    result.points[i].max_error < 1e-14,
-                    "Low-order (n={}) error {} should be < 1e-14 at T={}",
-                    i + 1,
-                    result.points[i].max_error,
-                    t
-                );
-            }
+            // The highest order (n=n_max) can integrate all moments in the
+            // fixed set exactly, so it should achieve high accuracy.
+            let last = result.points.last().unwrap();
+            assert!(
+                last.max_error < 1e-3,
+                "Highest order (n={}) error {} should be < 1e-3 at T={}",
+                last.n,
+                last.max_error,
+                t
+            );
+
+            // Errors should generally decrease: first point > last point
+            assert!(
+                result.points[0].max_error > result.points.last().unwrap().max_error,
+                "At T={}, low-order error should exceed high-order error",
+                t
+            );
         }
     }
 
@@ -1469,21 +1510,26 @@ mod tests {
     #[test]
     fn test_error_curve_t_zero() {
         // T=0 special case: moments are exact (F_m(0) = 1/(2m+1))
-        // Reconstruction should be essentially exact
         let result = error_curve(5, 0.0).unwrap();
 
         assert_eq!(result.t, 0.0);
         assert_eq!(result.points.len(), 5);
 
-        // At T=0, quadrature should be highly accurate
-        // (numerical errors may still exist but should be very small)
+        // With fixed moment set (0..2*n_max-1 = 0..9), low-order rules have
+        // non-trivial error on moments they cannot integrate. Only the highest
+        // order (n=5) can integrate all moments 0..9 exactly.
+        let last = result.points.last().unwrap();
+        assert!(
+            last.max_error < 1e-10,
+            "At T=0, highest order (n={}) error {} should be near machine precision",
+            last.n,
+            last.max_error
+        );
+
+        // All errors should still be bounded and finite
         for point in &result.points {
-            assert!(
-                point.max_error < 1e-10,
-                "At T=0, error for n={} should be near machine precision, got {}",
-                point.n,
-                point.max_error
-            );
+            assert!(point.max_error.is_finite(), "Error must be finite");
+            assert!(point.max_error >= 0.0, "Error must be non-negative");
         }
     }
 
@@ -1501,10 +1547,11 @@ mod tests {
             for point in &result.points {
                 assert!(point.max_error >= 0.0, "Error must be non-negative");
                 assert!(point.max_error.is_finite(), "Error must be finite");
-                // Large T errors should still be bounded
+                // With fixed moment set, low-order errors can be larger but
+                // should still be bounded (< 1.0)
                 assert!(
-                    point.max_error < 1e-2,
-                    "Error {} at T={}, n={} exceeds bound 1e-2",
+                    point.max_error < 1.0,
+                    "Error {} at T={}, n={} exceeds bound 1.0",
                     point.max_error,
                     t,
                     point.n
@@ -1562,28 +1609,34 @@ mod tests {
         for &t in &[1.0, 5.0, 10.0, 25.0] {
             let result = error_curve(10, t).unwrap();
 
-            // Low-order quadrature should achieve very high accuracy
+            // With the fixed moment set (0..2*n_max-1 = 0..19 for n_max=10),
+            // low-order quadrature has significant error on higher moments,
+            // while high-order quadrature should be very accurate.
+
+            // Low-order (n=1): large error expected since it only integrates
+            // moments 0..1 exactly, but is tested against 0..19
             assert!(
-                result.points[0].max_error < 1e-14,
-                "At T={}, n=1 error {} should be < 1e-14",
+                result.points[0].max_error > 1e-15,
+                "At T={}, n=1 error {} should be nonzero with fixed moment set",
                 t,
                 result.points[0].max_error
             );
 
-            // Mid-order quadrature should still be quite accurate
-            assert!(
-                result.points[4].max_error < 1e-10,
-                "At T={}, n=5 error {} should be < 1e-10",
-                t,
-                result.points[4].max_error
-            );
-
-            // High-order quadrature may have larger errors due to numerical issues
-            // but should still be bounded (< 1e-3)
+            // High-order quadrature (n=10) can integrate all moments in the set
+            // and should achieve high accuracy (< 1e-3, allowing for numerical noise)
             assert!(
                 result.points[9].max_error < 1e-3,
                 "At T={}, n=10 error {} should be < 1e-3",
                 t,
+                result.points[9].max_error
+            );
+
+            // The error should generally decrease from low to high order
+            assert!(
+                result.points[0].max_error > result.points[9].max_error,
+                "At T={}, n=1 error ({}) should exceed n=10 error ({})",
+                t,
+                result.points[0].max_error,
                 result.points[9].max_error
             );
         }
@@ -1638,6 +1691,148 @@ mod tests {
         for point in &result.points {
             assert!(point.max_error >= 0.0);
             assert!(point.max_error.is_finite());
+        }
+    }
+
+    // =========================================================================
+    // Golden Tests - Mathematical Property Validation
+    // Reference: Dupuis, Rys & King (1976), J. Chem. Phys. 65, 111
+    //
+    // These tests validate the mathematical properties that define valid Rys
+    // quadrature, rather than exact numerical equality with an external reference.
+    // This approach is correct because:
+    // 1. Different implementations may produce numerically different roots/weights
+    // 2. All valid implementations satisfy the same mathematical properties
+    // 3. The defining property is moment reconstruction: sum_k w_k r_k^m = F_m(T)
+    //
+    // Reference data in tests/golden/rys/reference.json was generated using
+    // scipy/numpy and the libcint-style RDK algorithm. It can be used for:
+    // - Verifying the algorithm produces valid quadrature
+    // - Cross-validation with other implementations
+    // - Regression testing if the algorithm is changed
+    // =========================================================================
+
+    #[test]
+    fn test_golden_order_1() {
+        // n=1, T=1.0 - simplest case with analytical solution
+        // This case has a unique solution, so exact match is expected
+        let result = rys_roots(1, 1.0).unwrap();
+
+        // For n=1: root = mu_1 / (mu_0 - mu_1), weight = mu_0
+        // F_0(1) = 0.7468241328124272, F_1(1) = 0.1894723458204924
+        // ratio = 0.1894723... / (0.7468241... - 0.1894723...) = 0.34...
+        // root = ratio / (1 + ratio) = 0.2537...
+        assert_abs_diff_eq!(result.weights[0], 0.74682413281242721, epsilon = 1e-12);
+        // Verify moment reconstruction: w_0 = F_0(T)
+        assert_abs_diff_eq!(
+            result.weights[0],
+            crate::boys::boys_eval(0, 1.0).unwrap().value,
+            epsilon = 1e-12
+        );
+    }
+
+    #[test]
+    fn test_golden_moment_reconstruction_tolerance() {
+        // Test that all well-conditioned cases meet the 1e-10 moment reconstruction tolerance
+        let test_cases = [
+            // (order, T) - focusing on well-conditioned cases (order <= 7 or large T)
+            (1, 1.0),
+            (2, 2.0),
+            (3, 5.0),
+            (4, 10.0),
+            (5, 10.0),
+            (6, 20.0),
+            (7, 20.0),
+            (8, 50.0),
+            (9, 50.0),
+            (10, 50.0),
+        ];
+
+        for (order, t) in test_cases {
+            let result = rys_roots(order, t).unwrap();
+            let boys_results = boys_eval_all((2 * order - 1) as u32, t).unwrap();
+
+            // Check moment reconstruction for all moments 0..2n-1
+            for (m, boys_result) in boys_results.iter().enumerate().take(2 * order) {
+                let quadrature_sum: f64 = result
+                    .roots
+                    .iter()
+                    .zip(result.weights.iter())
+                    .map(|(&r, &w)| w * r.powi(m as i32))
+                    .sum();
+                let expected = boys_result.value;
+                let error = (expected - quadrature_sum).abs();
+
+                assert!(
+                    error < 1e-10,
+                    "Moment reconstruction failed for n={}, T={}, m={}: error={:.2e}",
+                    order,
+                    t,
+                    m,
+                    error
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_golden_weight_sum_equals_f0() {
+        // Property: sum of weights = F_0(T) (zeroth moment)
+        let test_cases = [
+            (1, 0.5),
+            (2, 1.0),
+            (3, 2.0),
+            (5, 5.0),
+            (7, 10.0),
+            (10, 50.0),
+        ];
+
+        for (order, t) in test_cases {
+            let result = rys_roots(order, t).unwrap();
+            let weight_sum: f64 = result.weights.iter().sum();
+            let f0 = crate::boys::boys_eval(0, t).unwrap().value;
+
+            assert_abs_diff_eq!(weight_sum, f0, epsilon = 1e-10,);
+        }
+    }
+
+    #[test]
+    fn test_golden_roots_in_unit_interval() {
+        // All roots must be in [0, 1)
+        for order in 1..=MAX_ROOTS {
+            for &t in &[0.0, 0.5, 1.0, 5.0, 10.0, 50.0] {
+                let result = rys_roots(order, t).unwrap();
+                for (i, &root) in result.roots.iter().enumerate() {
+                    assert!(
+                        root >= 0.0 && root < 1.0,
+                        "Root {} = {} out of range for n={}, T={}",
+                        i,
+                        root,
+                        order,
+                        t
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_golden_weights_positive() {
+        // All weights must be non-negative (strictly positive for non-degenerate cases)
+        for order in 1..=MAX_ROOTS {
+            for &t in &[0.1, 0.5, 1.0, 5.0, 10.0, 50.0] {
+                let result = rys_roots(order, t).unwrap();
+                for (i, &weight) in result.weights.iter().enumerate() {
+                    assert!(
+                        weight >= 0.0,
+                        "Weight {} = {} not positive for n={}, T={}",
+                        i,
+                        weight,
+                        order,
+                        t
+                    );
+                }
+            }
         }
     }
 }

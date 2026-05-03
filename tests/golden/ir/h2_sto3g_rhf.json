@@ -1,0 +1,101 @@
+{
+  "_provenance": {
+    "generator": "scripts/phase5/generate_ir_golden.py",
+    "pyscf_version": "2.11.0",
+    "numpy_version": "1.26.4",
+    "basis": "sto-3g",
+    "method": "RHF",
+    "conv_tol": 1e-12,
+    "cart": true,
+    "unit_input": "angstrom",
+    "au_to_kmmol_factor": 974.8801193081486,
+    "description": "US-097 dipole integrals + IR intensities golden reference"
+  },
+  "name": "h2",
+  "atoms": [
+    {
+      "Z": 1,
+      "symbol": "H",
+      "pos_bohr": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "Z": 1,
+      "symbol": "H",
+      "pos_bohr": [
+        0.0,
+        0.0,
+        1.3983973321781458
+      ]
+    }
+  ],
+  "n_atoms": 2,
+  "n_modes": 1,
+  "energy": -1.1167593073964255,
+  "dipole_au": [
+    0.0,
+    0.0,
+    2.220446049250313e-16
+  ],
+  "dipole_debye": [
+    0.0,
+    0.0,
+    5.643810787036914e-16
+  ],
+  "freq_wavenumber": [
+    5039.894455098768
+  ],
+  "norm_mode": [
+    [
+      [
+        0.0,
+        -3.85933528377727e-17,
+        0.704295212273764
+      ],
+      [
+        8.947024818225855e-17,
+        1.2231876826147482e-16,
+        -0.7042952122737637
+      ]
+    ]
+  ],
+  "dipole_derivs_cartesian": [
+    [
+      0.0,
+      0.0,
+      0.0,
+      3.3306690738754696e-16,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      3.3306690738754696e-16,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.1102230246251565e-16
+    ]
+  ],
+  "dmu_dQ": [
+    [
+      2.979957886526115e-32,
+      4.074033386030345e-32,
+      -7.819247607995946e-17
+    ]
+  ],
+  "ir_intensities_km_mol": [
+    5.960478774486869e-30
+  ]
+}

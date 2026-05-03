@@ -1,0 +1,4 @@
+# SPA fallback: serve index.html for all paths not matching a static file.
+# Works with Cloudflare Pages and Netlify.
+# The 200 status code means "rewrite" (not redirect), so the URL stays the same.
+/*  /index.html  200

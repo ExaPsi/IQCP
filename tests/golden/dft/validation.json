@@ -1,0 +1,660 @@
+{
+  "pyscf_version": "2.11.0",
+  "generated": "2026-03-27T05:03:44Z",
+  "description": "Authoritative PySCF reference: 6 molecules x 6 bases x 3 methods + D3BJ",
+  "settings": {
+    "B3LYP_variant": "b3lyp5 (VWN5 correlation, NOT default B3LYP which uses VWN3)",
+    "6-31G*_convention": "Cartesian d-functions (mol.cart=True, 6d not 5d)",
+    "convergence": "conv_tol=1e-12 for STO-3G and 6-31G*; conv_tol=1e-10 for cc-pVDZ (PySCF reference tighter than IQCP's 1e-10 threshold)",
+    "grid": "PySCF default (level=3, nwchem_prune, Treutler-Ahlrichs radial)",
+    "threading": "single-threaded (lib.num_threads(1))"
+  },
+  "geometries": {
+    "H2": "H 0 0 0; H 0 0 1.4 (Bohr)",
+    "HF": "H 0 0 0; F 0 0 1.7328 (Bohr)",
+    "H2O": "O 0.0 0.0 0.2217282; H 0.0 1.4305447 -0.8869128; H 0.0 -1.4305447 -0.8869128 (Bohr)",
+    "NH3": "N 0.0 0.0 0.219705; H 0.0 1.7714918 -0.512645; H 1.5342036 -0.8857459 -0.512645; H -1.5342036 -0.8857459 -0.512645 (Bohr)",
+    "CH4": "C 0 0 0; H 1.1851 1.1851 1.1851; H -1.1851 -1.1851 1.1851; H -1.1851 1.1851 -1.1851; H 1.1851 -1.1851 -1.1851 (Bohr)",
+    "C6H6": "C 0 1.397 0; C 1.2098 0.6985 0; C 1.2098 -0.6985 0; C 0 -1.397 0; C -1.2098 -0.6985 0; C -1.2098 0.6985 0; H 0 2.481 0; H 2.1486 1.2405 0; H 2.1486 -1.2405 0; H 0 -2.481 0; H -2.1486 -1.2405 0; H -2.1486 1.2405 0 (Angstrom)"
+  },
+  "results": [
+    {
+      "molecule": "H2",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "energy": -1.116714325062551,
+      "converged": true,
+      "iterations": 2,
+      "n_basis": 2,
+      "n_electrons": 2
+    },
+    {
+      "molecule": "H2",
+      "basis": "sto-3g",
+      "method": "LDA",
+      "energy": -1.1212007041596959,
+      "converged": true,
+      "iterations": 2,
+      "n_basis": 2,
+      "n_electrons": 2
+    },
+    {
+      "molecule": "H2",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "energy": -1.1586001480536474,
+      "converged": true,
+      "iterations": 2,
+      "n_basis": 2,
+      "n_electrons": 2
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "energy": -1.1267427044518272,
+      "converged": true,
+      "iterations": 6,
+      "n_basis": 4,
+      "n_electrons": 2
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31g*",
+      "method": "LDA",
+      "energy": -1.1326691268172882,
+      "converged": true,
+      "iterations": 4,
+      "n_basis": 4,
+      "n_electrons": 2
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31g*",
+      "method": "B3LYP",
+      "energy": -1.1687129897605577,
+      "converged": true,
+      "iterations": 4,
+      "n_basis": 4,
+      "n_electrons": 2
+    },
+    {
+      "molecule": "HF",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "energy": -98.57077532424056,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 6,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "HF",
+      "basis": "sto-3g",
+      "method": "LDA",
+      "energy": -98.24587315661505,
+      "converged": true,
+      "iterations": 6,
+      "n_basis": 6,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "HF",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "energy": -98.88126529002626,
+      "converged": true,
+      "iterations": 6,
+      "n_basis": 6,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "energy": -100.00286325730463,
+      "converged": true,
+      "iterations": 9,
+      "n_basis": 17,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31g*",
+      "method": "LDA",
+      "energy": -99.76633158746812,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 17,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31g*",
+      "method": "B3LYP",
+      "energy": -100.38211096579279,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 17,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "H2O",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "energy": -74.9630257175466,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 7,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "H2O",
+      "basis": "sto-3g",
+      "method": "LDA",
+      "energy": -74.73203834615984,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 7,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "H2O",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "energy": -75.2752382149126,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 7,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "energy": -76.01050569647506,
+      "converged": true,
+      "iterations": 10,
+      "n_basis": 19,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31g*",
+      "method": "LDA",
+      "energy": -75.84438175789643,
+      "converged": true,
+      "iterations": 9,
+      "n_basis": 19,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31g*",
+      "method": "B3LYP",
+      "energy": -76.37159375341533,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 19,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "NH3",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "energy": -55.454361658487954,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 8,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "NH3",
+      "basis": "sto-3g",
+      "method": "LDA",
+      "energy": -55.29075298644801,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 8,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "NH3",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "energy": -55.74932495255851,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 8,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "energy": -56.18399100969381,
+      "converged": true,
+      "iterations": 10,
+      "n_basis": 21,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31g*",
+      "method": "LDA",
+      "energy": -56.06153732874722,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 21,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31g*",
+      "method": "B3LYP",
+      "energy": -56.51134161643398,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 21,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "CH4",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "energy": -39.72682902478178,
+      "converged": true,
+      "iterations": 6,
+      "n_basis": 9,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "CH4",
+      "basis": "sto-3g",
+      "method": "LDA",
+      "energy": -39.61679835214324,
+      "converged": true,
+      "iterations": 6,
+      "n_basis": 9,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "CH4",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "energy": -40.00251270098894,
+      "converged": true,
+      "iterations": 6,
+      "n_basis": 9,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "energy": -40.19515375820442,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 23,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31g*",
+      "method": "LDA",
+      "energy": -40.09718983409372,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 23,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31g*",
+      "method": "B3LYP",
+      "energy": -40.48225959744574,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 23,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "energy": -227.8906035034241,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 36,
+      "n_electrons": 42
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "sto-3g",
+      "method": "LDA",
+      "energy": -227.26287408281328,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 36,
+      "n_electrons": 42
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "energy": -229.2514603380072,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 36,
+      "n_electrons": 42
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "energy": -230.70210131407603,
+      "converged": true,
+      "iterations": 10,
+      "n_basis": 102,
+      "n_electrons": 42
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "6-31g*",
+      "method": "LDA",
+      "energy": -230.0901950059974,
+      "converged": true,
+      "iterations": 10,
+      "n_basis": 102,
+      "n_electrons": 42
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "6-31g*",
+      "method": "B3LYP",
+      "energy": -232.0942742817622,
+      "converged": true,
+      "iterations": 10,
+      "n_basis": 102,
+      "n_electrons": 42
+    },
+    {
+      "molecule": "H2",
+      "basis": "sto-3g",
+      "method": "B3LYP-D3BJ",
+      "energy": -1.1587407326967218,
+      "converged": true,
+      "iterations": 2,
+      "n_basis": 2
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31g*",
+      "method": "B3LYP-D3BJ",
+      "energy": -1.1688535744036321,
+      "converged": true,
+      "iterations": 4,
+      "n_basis": 4
+    },
+    {
+      "molecule": "HF",
+      "basis": "sto-3g",
+      "method": "B3LYP-D3BJ",
+      "energy": -98.88144528533046,
+      "converged": true,
+      "iterations": 6,
+      "n_basis": 6
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31g*",
+      "method": "B3LYP-D3BJ",
+      "energy": -100.38229096109698,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 17
+    },
+    {
+      "molecule": "H2O",
+      "basis": "sto-3g",
+      "method": "B3LYP-D3BJ",
+      "energy": -75.27581209220833,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 7
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31g*",
+      "method": "B3LYP-D3BJ",
+      "energy": -76.37216763071106,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 19
+    },
+    {
+      "molecule": "NH3",
+      "basis": "sto-3g",
+      "method": "B3LYP-D3BJ",
+      "energy": -55.75054438998308,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 8
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31g*",
+      "method": "B3LYP-D3BJ",
+      "energy": -56.51256105385855,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 21
+    },
+    {
+      "molecule": "CH4",
+      "basis": "sto-3g",
+      "method": "B3LYP-D3BJ",
+      "energy": -40.00442646094168,
+      "converged": true,
+      "iterations": 6,
+      "n_basis": 9
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31g*",
+      "method": "B3LYP-D3BJ",
+      "energy": -40.48417335739848,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 23
+    },
+    {
+      "molecule": "H2",
+      "basis": "cc-pvdz",
+      "method": "RHF",
+      "energy": -1.1287094489798903,
+      "converged": true,
+      "iterations": 5,
+      "n_basis": 10,
+      "n_electrons": 2
+    },
+    {
+      "molecule": "H2",
+      "basis": "cc-pvdz",
+      "method": "LDA",
+      "energy": -1.13145809678501,
+      "converged": true,
+      "iterations": 5,
+      "n_basis": 10,
+      "n_electrons": 2
+    },
+    {
+      "molecule": "H2",
+      "basis": "cc-pvdz",
+      "method": "B3LYP",
+      "energy": -1.166534775939096,
+      "converged": true,
+      "iterations": 5,
+      "n_basis": 10,
+      "n_electrons": 2
+    },
+    {
+      "molecule": "HF",
+      "basis": "cc-pvdz",
+      "method": "RHF",
+      "energy": -100.01983118695853,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 20,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "HF",
+      "basis": "cc-pvdz",
+      "method": "LDA",
+      "energy": -99.78413784925793,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 20,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "HF",
+      "basis": "cc-pvdz",
+      "method": "B3LYP",
+      "energy": -100.3990982893055,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 20,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "H2O",
+      "basis": "cc-pvdz",
+      "method": "RHF",
+      "energy": -76.02711576564408,
+      "converged": true,
+      "iterations": 9,
+      "n_basis": 25,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "H2O",
+      "basis": "cc-pvdz",
+      "method": "LDA",
+      "energy": -75.85751315191276,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 25,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "H2O",
+      "basis": "cc-pvdz",
+      "method": "B3LYP",
+      "energy": -76.38441293702004,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 25,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "NH3",
+      "basis": "cc-pvdz",
+      "method": "RHF",
+      "energy": -56.19570893849166,
+      "converged": true,
+      "iterations": 9,
+      "n_basis": 30,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "NH3",
+      "basis": "cc-pvdz",
+      "method": "LDA",
+      "energy": -56.06876302616544,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 30,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "NH3",
+      "basis": "cc-pvdz",
+      "method": "B3LYP",
+      "energy": -56.5182501841206,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 30,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "CH4",
+      "basis": "cc-pvdz",
+      "method": "RHF",
+      "energy": -40.19872492896991,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 35,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "CH4",
+      "basis": "cc-pvdz",
+      "method": "LDA",
+      "energy": -40.09614548862446,
+      "converged": true,
+      "iterations": 6,
+      "n_basis": 35,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "CH4",
+      "basis": "cc-pvdz",
+      "method": "B3LYP",
+      "energy": -40.48069420110117,
+      "converged": true,
+      "iterations": 6,
+      "n_basis": 35,
+      "n_electrons": 10
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "cc-pvdz",
+      "method": "RHF",
+      "energy": -230.72263864316776,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 120,
+      "n_electrons": 42
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "cc-pvdz",
+      "method": "LDA",
+      "energy": -230.10799589360383,
+      "converged": true,
+      "iterations": 8,
+      "n_basis": 120,
+      "n_electrons": 42
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "cc-pvdz",
+      "method": "B3LYP",
+      "energy": -232.11283753050347,
+      "converged": true,
+      "iterations": 7,
+      "n_basis": 120,
+      "n_electrons": 42
+    }
+  ],
+  "basis_sets": [
+    "sto-3g",
+    "3-21g",
+    "6-31g",
+    "6-31g*",
+    "6-31+g*",
+    "cc-pvdz"
+  ]
+}

@@ -34,10 +34,23 @@
 
 pub mod basis;
 pub mod boys;
+pub mod constants;
+pub mod dft;
 pub mod integrals;
+pub mod ir;
+pub mod optimizer;
+pub mod orbital;
+pub mod population;
+pub mod raman;
 pub mod rys;
 pub mod scf;
 pub mod simd;
+pub mod spectra;
+pub mod thermo;
+pub mod thermochemistry;
+
+#[cfg(test)]
+mod golden_phase5;
 
 /// Library version from Cargo.toml
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -57,7 +70,11 @@ mod tests {
         // Verify all modules compile and are accessible
         let _ = basis::VERSION;
         let _ = boys::VERSION;
+        let _ = dft::VERSION;
         let _ = integrals::VERSION;
+        let _ = optimizer::VERSION;
+        let _ = orbital::VERSION;
+        let _ = population::VERSION;
         let _ = rys::VERSION;
         let _ = scf::VERSION;
     }

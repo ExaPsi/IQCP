@@ -1,132 +1,191 @@
-# Interactive Quantum Chemistry Playground (IQCP)
+# IQCP: Interactive Quantum Chemistry Playground
 
-A browser-based educational web application for teaching quantum chemistry concepts through interactive exploration.
+A client-side quantum chemistry engine that compiles a Rust implementation of Hartree–Fock and Kohn–Sham DFT to WebAssembly, executing all numerical work directly in the browser with no server.
 
 [![Live Demo](https://img.shields.io/badge/demo-iqcp.dev-blue.svg)](https://iqcp.dev)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18798310.svg)](https://doi.org/10.5281/zenodo.18798310)
 
 **Live Site:** [https://iqcp.dev](https://iqcp.dev)
 
 ## Overview
 
-IQCP enables students to interactively explore **Boys functions**, **Rys quadrature**, and **SCF convergence** through transparent, reproducible computation—all within a web browser with no installation required.
+IQCP supports closed-shell **RHF**, **LDA**, **B3LYP**, and **B3LYP-D3(BJ)** with six basis sets (STO-3G, 3-21G, 6-31G, 6-31G\*, 6-31+G\*, cc-pVDZ) for elements H–Ar. The engine implements the full computational pipeline:
 
-**Target Publication:** *Journal of Chemical Education* Technology Report
+- SCF convergence with DIIS acceleration
+- Analytical energy gradients and geometry optimization
+- Potential-energy-surface (PES) scans with rigid and relaxed modes
+- Analytical Hessians via Coupled-Perturbed Hartree–Fock (CPHF)
+- Vibrational frequencies and normal-mode analysis
+- IR intensities from dipole derivatives
+- Semi-analytical Raman activities from polarizability derivatives
+- RRHO thermochemistry (ZPE, enthalpy, entropy, Gibbs free energy)
+- Electron density and molecular orbital visualization
+- Mulliken and Löwdin population analysis
 
-### Key Features
+All computation runs entirely client-side via two WebAssembly modules (470 KB core + 289 KB spectra, gzipped).
 
-- **Zero Installation:** Runs entirely in the browser using WebAssembly
-- **Interactive Exploration:** Real-time parameter adjustment with instant visual feedback
-- **Transparent Computation:** Inspect intermediate values and understand algorithm internals
-- **Reproducible Results:** Deep links and exportable artifacts for every calculation
-- **Custom Molecules:** Enter arbitrary geometries and compute integrals on-the-fly (5 basis sets)
-- **Educational Focus:** Designed for classroom use with guided lab activities
+## Validation
 
-## Core Modules
+Validated against PySCF 2.11.0 across **108 single-point benchmark systems** (six molecules × six basis sets × three methods):
 
-### Module A: Boys Function Lab
+| Quantity | Maximum deviation | Median |
+|----------|-------------------|--------|
+| RHF energy | 77 nHa | 0.4 nHa |
+| DFT energy | 148 µHa | 21 µHa |
+| RHF gradient | 10⁻⁵ Ha/bohr | — |
+| H₂O frequency | <0.01 cm⁻¹ | — |
+| H₂O ZPE | 7.0 × 10⁻⁷ Ha | — |
+| H₂O Gibbs (298 K) | 7.6 × 10⁻⁷ Ha | — |
+| Raman polarizability deriv. (vs Gaussian 09) | 2.5 × 10⁻⁷ Ha/bohr² | — |
 
-Interactive exploration of F_m(T) with regime visualization:
-- **Series expansion** (T < 12): Taylor expansion with double factorial
-- **Recurrence** (12 ≤ T < 30): erf(√T) + upward recurrence
-- **Asymptotic** (T ≥ 30): Asymptotic series expansion
+The 1,418 Rust tests + 361 TypeScript tests in this repository cover all reported numerical claims. See **Reproducing Manuscript Results** below.
 
-### Module B: Rys Quadrature Lab
+## Quick Start
 
-Roots and weights computation for Gaussian integrals:
-- Moment computation via Boys functions
-- Modified Chebyshev algorithm for recurrence coefficients
-- Eigenvalue decomposition for roots and weights
-- Order-error tradeoff visualization
+### Try It Now
 
-### Module C: SCF Sandbox (RHF)
+Visit [https://iqcp.dev](https://iqcp.dev) — no installation required.
 
-Restricted Hartree-Fock self-consistent field calculations:
-- Interactive convergence visualization
-- DIIS acceleration toggle
-- Matrix inspection (Fock, density, coefficients)
-- Convergence profiles: loose (1e-4), medium (1e-6), tight (1e-8)
+### Local Build
+
+**Prerequisites:** Rust 1.94+, wasm-pack, Node.js 18+, npm
+
+```bash
+git clone https://github.com/ExaPsi/IQCP.git
+cd IQCP
+
+# Build Rust workspace (4 crates)
+cargo build --workspace
+
+# Build both WASM modules
+wasm-pack build crates/qc-wasm --release --target web --out-dir ../../apps/web/src/wasm
+wasm-pack build crates/qc-wasm-spectra --release --target web --out-dir ../../apps/web/src/wasm-spectra
+
+# Frontend
+cd apps/web
+npm install
+npm run dev
+```
+
+Application available at `http://localhost:5173`.
 
 ## Architecture
 
 ```
 Browser SPA (React + TypeScript + Vite)
     ↓ postMessage
-Web Worker (non-blocking computation)
-    ↓ wasm-bindgen
-qc-wasm (Rust WASM module)
-    ↓
-qc-core (pure Rust algorithms)
+Web Worker (off-main-thread compute)
+    ↓ wasm-bindgen (lazy import for spectra)
+qc-wasm (470 KB) + qc-wasm-spectra (289 KB)
+    ↓ Rust FFI
+qc-core (pure Rust algorithms, native + WASM)
 ```
 
-All heavy computation runs in a Web Worker to keep the UI responsive.
+**Crates:**
+- `qc-core` — pure Rust algorithms (SCF, DFT, gradients, Hessians, IR, Raman, thermo)
+- `qc-wasm` — eager-loaded WASM bindings (SCF/DFT/gradients/optimization)
+- `qc-wasm-spectra` — lazy-loaded WASM bindings (Hessian, CPHF, IR, Raman, thermochemistry)
+- `qc-io` — shared serde schemas (RunState, RunArtifact)
 
-## Getting Started
+## Six Interactive Modules
 
-### Try It Now
+1. **Module A — Basis Set Explorer:** Radial profiles, contraction coefficients, basis comparison
+2. **Module B — Integral Inspector:** Overlap, kinetic, nuclear, ERI matrices with primitive breakdown
+3. **Module C — Boys Function Lab:** Series and recurrence regimes, regime visualization
+4. **Module D — Rys Quadrature Lab:** Roots, weights, polynomial reconstruction, order-error trade-offs
+5. **Module E — SCF Sandbox:** RHF/LDA/B3LYP/B3LYP-D3(BJ) with DIIS, 3D molecular viewer, PES scans, geometry optimization, electron-density and molecular-orbital isosurface visualization, Mulliken/Löwdin population analysis
+6. **Module F — Frequency & Vibrational Spectra:** Analytical Hessians via CPHF, normal-mode analysis, IR intensities, semi-analytical Raman activities, RRHO thermochemistry (ZPE, H, S, G), simulated IR/Raman spectra with Lorentzian/Gaussian broadening (lazy-loaded via `qc-wasm-spectra`)
 
-Visit [https://iqcp.dev](https://iqcp.dev) to use IQCP directly in your browser—no installation required.
+Every module state is URL-encodable via deep links for reproducibility.
 
-### Local Development
+## Reproducing Manuscript Results
 
-#### Prerequisites
+The numerical claims in the JCIM manuscript trace to data and scripts committed in this repository.
 
-- **Rust** (stable, 1.70+)
-- **wasm-pack** (`cargo install wasm-pack`)
-- **Node.js** (18+)
-- **npm** or **pnpm**
-
-#### Installation
+### Validation Scripts (PySCF reference generators)
 
 ```bash
-# Clone the repository
-git clone https://github.com/ExaPsi/IQCP.git
-cd IQCP
+# Activate Python environment with PySCF 2.11.0
+python -m venv .venv && source .venv/bin/activate
+pip install pyscf==2.11.0 numpy scipy
 
-# Build the Rust workspace
-cargo build --workspace
+# Reproduce gradient FD self-consistency (manuscript §4.4)
+python scripts/validation/pyscf_fd_self_consistency.py
 
-# Build the WASM module
-wasm-pack build crates/qc-wasm --release --target web --out-dir ../../apps/web/src/wasm
+# Reproduce geometry optimization (manuscript §4.5)
+python scripts/validation/pyscf_geometry_optimization.py
 
-# Install frontend dependencies
-cd apps/web
-npm install
+# Regenerate population analysis golden file
+python scripts/validation/pyscf_population_analysis.py
 
-# Start the development server
-npm run dev
+# Phase 5 golden generators (Hessian, IR, Raman, thermo)
+python scripts/phase5/generate_phase5_golden.py
+python scripts/phase5/generate_ir_golden.py
+python scripts/phase5/generate_raman_golden.py
+python scripts/phase5/generate_thermochem_golden.py
 ```
 
-The application will be available at `http://localhost:5173`.
+### Golden Test Data (`tests/golden/`)
+
+Reference values used by `cargo test`:
+
+- `boys/`, `rys/`, `eri/`, `integrals/` — integral evaluation
+- `scf/`, `dft/` — SCF energies, DFT functionals, gradients, populations
+- `pes/` — potential energy surface scans
+- `phase5/` — Hessians, frequencies, optimized geometries
+- `ir/`, `raman/` — vibrational spectroscopy intensities
+- `thermo/`, `thermochem/` — thermodynamic properties
+
+### Performance Benchmarks (`tests/benchmarks/`)
+
+```bash
+# Run native Rust benchmarks (Criterion)
+cargo bench -p qc-core
+
+# PySCF timing reference (regenerate)
+python tests/benchmarks/pyscf/run_scf_timing.py
+```
+
+Browser benchmarks: see WASM benchmark JSONs in `tests/benchmarks/wasm/results/`.
+
+### Run the Full Test Suite
+
+```bash
+# Workspace tests (1,418 Rust)
+cargo test --workspace
+
+# Frontend tests (361 TypeScript)
+cd apps/web
+npm test
+```
 
 ## Project Structure
 
 ```
 IQCP/
 ├── apps/
-│   └── web/                 # React SPA (Vite + TypeScript)
+│   └── web/                 # React 18 + TypeScript + Vite
 │       ├── src/
-│       │   ├── components/  # React components
-│       │   ├── hooks/       # Custom hooks
-│       │   ├── lib/         # Utilities
-│       │   ├── stores/      # Zustand state management
-│       │   ├── types/       # TypeScript types
-│       │   ├── wasm/        # Built WASM module
-│       │   └── worker/      # Web Worker
-│       └── ...
+│       │   ├── components/  # Per-module UI (basis, boys, rys, scf, ...)
+│       │   ├── hooks/       # useWorker, useFrequency, useOptimizer, ...
+│       │   ├── stores/      # Zustand stores
+│       │   ├── worker/      # Web Worker handlers
+│       │   └── wasm*/       # Built WASM modules
 ├── crates/
 │   ├── qc-core/             # Pure Rust algorithms
-│   │   └── src/
-│   │       ├── boys/        # Boys function F_m(T)
-│   │       ├── rys/         # Rys quadrature
-│   │       └── scf/         # SCF engine with DIIS
-│   ├── qc-wasm/             # wasm-bindgen exports
+│   ├── qc-wasm/             # Core WASM bindings (eager)
+│   ├── qc-wasm-spectra/     # Spectroscopy WASM bindings (lazy)
 │   └── qc-io/               # Shared schemas
 ├── content/
-│   ├── labpack1/            # Lab Pack #1 materials
-│   └── presets/             # Pre-computed molecular systems
+│   └── presets/             # Curated systems and pre-computed integrals
+├── scripts/
+│   ├── validation/          # PySCF reference scripts (FD, opt, population)
+│   ├── phase5/              # Phase 5 golden data generators
+│   └── *.py                 # Other utility scripts
 └── tests/
-    └── golden/              # Golden test reference data
+    ├── golden/              # Reference values for cargo test
+    └── benchmarks/          # Criterion (Rust), PySCF, WASM browser timings
 ```
 
 ## Development
@@ -135,115 +194,92 @@ IQCP/
 
 ```bash
 # Rust
-cargo build --workspace              # Build all crates
-cargo test --workspace               # Run all tests
-cargo fmt --all                      # Format code
-cargo clippy --workspace             # Lint code
+cargo build --workspace
+cargo test --workspace
+cargo fmt --all
+cargo clippy --workspace
 
-# WASM
+# WASM (both modules)
 wasm-pack build crates/qc-wasm --release --target web --out-dir ../../apps/web/src/wasm
+wasm-pack build crates/qc-wasm-spectra --release --target web --out-dir ../../apps/web/src/wasm-spectra
 
-# Web (from apps/web/)
-npm run dev                          # Start dev server
-npm run build                        # Production build
-npm run lint                         # Lint TypeScript
-npm run typecheck                    # Type check
+# Web
+cd apps/web
+npm run dev
+npm run build
+npm run lint
+npm run typecheck
+npm test
 ```
 
 ### Pre-Commit Checklist
 
 ```bash
-# Rust checks
 cargo fmt --all -- --check
 cargo clippy --workspace -- -D warnings
 cargo test --workspace
-
-# Web checks (from apps/web/)
-npm run lint
-npm run typecheck
-npm run build
+cd apps/web && npm run lint && npm run typecheck && npm run build
 ```
 
-## Technology Stack
+## Numerical Settings
 
-### Frontend
+| Setting | Value |
+|---------|-------|
+| SCF energy convergence | 1 × 10⁻¹⁰ Ha |
+| DIIS subspace size | 6 vectors |
+| ERI storage | 8-fold symmetry, stored once before SCF |
+| DFT grid | SG-1 pruning, 75 Mura–Knowles radial × Lebedev (max 194) |
+| B3LYP variant | B3LYP5 (VWN5 correlation) |
+| Cartesian d-functions | Default (`mol.cart=True` analog) |
+| Cross-browser reproducibility | Bit-identical IEEE 754 Float64 (verified across V8, SpiderMonkey, JavaScriptCore) |
 
-- React 18+ with TypeScript (strict mode)
-- Vite for bundling
-- TailwindCSS for styling
-- Zustand for state management
-- Plotly.js for interactive plots
+## Performance
 
-### Compute
+| Workflow | Time (Apple M2 Max, Chrome) |
+|----------|-----------------------------|
+| WASM init + first calculation | ~50 ms |
+| H₂O B3LYP/6-31G* SCF | 183 ms |
+| C₆H₆ B3LYP/6-31G* SCF | ~28 s |
+| H₂O frequency analysis | ~5 s |
 
-- Rust (stable)
-- wasm-bindgen + wasm-pack
-- serde + serde-wasm-bindgen
-
-## Numerical Specifications
-
-| Algorithm | Tolerance | Notes |
-|-----------|-----------|-------|
-| Boys F_m(T) | 1e-12 | Absolute, all regimes |
-| Rys roots | (0, 1) | Strict open interval |
-| Rys weights | > 0 | Strictly positive |
-| Rys reconstruction | 1e-10 | Moment accuracy |
-| SCF energy | 1e-8 Ha | Final converged value |
-| SCF density | 1e-6 | Frobenius norm |
-
-## Performance Targets
-
-| Metric | Target |
-|--------|--------|
-| Slider latency | ≤ 200ms |
-| Input debouncing | 100ms |
-| WASM bundle size | < 500KB gzipped |
-| Cross-browser reproducibility | Deterministic within tolerances |
-
-## Deep Links and Artifacts
-
-Every module state is URL-encodable for sharing and reproducibility:
-
-```
-https://iqcp.dev/boys?s=<base64-encoded-state>
-https://iqcp.dev/rys?s=<base64-encoded-state>
-https://iqcp.dev/scf?s=<base64-encoded-state>
-```
-
-Exportable artifacts include computation results and metadata for grading and reproducibility.
+Native Rust outperforms single-threaded PySCF for 95 of 108 benchmark systems under end-to-end conditions; the crossover with PySCF for B3LYP falls between 102 and 126 basis functions.
 
 ## Citation
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18798310.svg)](https://doi.org/10.5281/zenodo.18798310)
-
-If you use IQCP in your research or teaching, please cite:
+If you use IQCP in your research, please cite both the software (Zenodo) and the JCIM manuscript:
 
 ```bibtex
-@software{iqcp2026,
-  title  = {IQCP: Interactive Quantum Chemistry Playground},
-  author = {Sawatlon, Boodsarin and Paiboonvorachat, Nattapong and Vchirawongkwin, Viwat},
-  year   = {2026},
-  doi    = {10.5281/zenodo.18798310},
-  url    = {https://github.com/ExaPsi/IQCP}
+@software{iqcp2026software,
+  title   = {IQCP: Client-Side Quantum Chemistry from SCF to Vibrational
+             Spectra via WebAssembly},
+  author  = {Sawatlon, Boodsarin and Paiboonvorachat, Nattapong and
+             Vchirawongkwin, Viwat},
+  year    = {2026},
+  version = {2.0.0},
+  doi     = {10.5281/zenodo.18798310},
+  url     = {https://github.com/ExaPsi/IQCP}
 }
 ```
 
+A companion JCIM Article is in preparation; the citation will be updated upon publication.
+
 ## References
 
-### Primary Literature
+Key algorithmic references implemented in this work:
 
-- **Boys function:** Shavitt, I. (1963). *Methods in Computational Physics*, 2, 1-45.
-- **Rys quadrature:** Dupuis, M., Rys, J., & King, H. F. (1976). *J. Chem. Phys.*, 65, 111-116.
-- **DIIS acceleration:** Pulay, P. (1980). *Chem. Phys. Lett.*, 73, 393-398; (1982). *J. Comput. Chem.*, 3, 556-560.
-
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+- **Boys function:** Shavitt, I. *Methods in Computational Physics* **1963**, *2*, 1–45.
+- **Rys quadrature:** Dupuis, M.; Rys, J.; King, H. F. *J. Chem. Phys.* **1976**, *65*, 111–116.
+- **DIIS:** Pulay, P. *Chem. Phys. Lett.* **1980**, *73*, 393–398; *J. Comput. Chem.* **1982**, *3*, 556–560.
+- **B3LYP:** Becke, A. D. *J. Chem. Phys.* **1993**, *98*, 5648–5652; Stephens et al. *J. Phys. Chem.* **1994**, *98*, 11623–11627.
+- **D3(BJ) dispersion:** Grimme, S. et al. *J. Chem. Phys.* **2010**, *132*, 154104; *J. Comput. Chem.* **2011**, *32*, 1456–1465.
+- **CPHF for Raman:** Amos, R. D. *Chem. Phys. Lett.* **1986**, *124*, 376–381.
+- **PySCF (validation reference):** Sun, Q. et al. *J. Chem. Phys.* **2020**, *153*, 024109.
+- **WebAssembly:** Haas, A. et al. *PLDI* **2017**.
 
 ## License
 
-This project is licensed under the MIT License—see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
 
 ## Acknowledgments
 
-IQCP is developed for educational use in quantum chemistry courses. We thank the computational chemistry community for the foundational algorithms and the educators who provided feedback on pedagogical approaches.
+We thank the developers of PySCF and Gaussian 09 for the reference implementations used in cross-code validation, and the Rust and WebAssembly communities for the toolchains that make browser-native scientific computing possible.

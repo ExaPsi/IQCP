@@ -2,9 +2,10 @@
  * RysInternalsPanel - Display computational internals for Rys quadrature.
  *
  * Shows detailed information about the quadrature computation including
- * Algorithm 5.1 steps, sanity checks (roots in (0,1), sorted, weights positive),
+ * algorithm steps (Schmidt orthogonalization + companion matrix QR),
+ * sanity checks (roots in [0,1), sorted, weights non-negative),
  * weight function formula, three-term recurrence, moment reconstruction verification,
- * Hankel matrix visualization, Cholesky factorization, Jacobi matrix, and numerical stability.
+ * Hankel matrix structure (theoretical derivation), and numerical stability.
  *
  * @module components/rys/RysInternalsPanel
  */
@@ -31,14 +32,12 @@ const METHOD_DETAILS: Record<
   standard: {
     label: 'Standard Algorithm (RDK)',
     description:
-      'Rys-Dupuis-King algorithm: Uses Boys function moments to construct Hankel matrix, then Cholesky factorization to build Jacobi matrix, whose eigendecomposition yields nodes and weights.',
+      'Rys-Dupuis-King algorithm via Schmidt orthogonalization: builds orthonormal polynomials from Boys function moments, finds roots via companion matrix QR, and computes weights from polynomial evaluations at the roots.',
     steps: [
-      { text: '1. Compute moments:', latex: '\\mu_k = 2F_k(T)' },
-      { text: '2. Build Hankel matrices', latex: 'H, H^{(1)}' },
-      { text: '3. Cholesky factorize', latex: 'H = LL^T' },
-      { text: '4. Build Jacobi matrix', latex: 'J = L^{-1} H^{(1)} L^{-T}' },
-      { text: '5. Eigendecompose', latex: 'J = V \\Lambda V^T' },
-      { text: '6. Nodes/Weights:', latex: 't_i = \\lambda_i, \\; w_i = \\mu_0 (V_{0i})^2' },
+      { text: '1. Compute moments:', latex: '\\mu_k = F_k(T) \\text{ for } k = 0, \\ldots, 2n' },
+      { text: '2. Schmidt orthogonalization:', latex: 'P_0, P_1, \\ldots, P_n \\text{ from } \\{\\mu_k\\}' },
+      { text: '3. Companion matrix QR:', latex: '\\text{roots of } P_n' },
+      { text: '4. Weights:', latex: 'w_k = 1 / \\sum_j P_j(r_k)^2' },
     ],
   },
 };
@@ -559,9 +558,10 @@ function JacobiMatrixDisplay({ nroots }: { nroots: number }) {
       {/* Connection to nodes/weights */}
       <div className="bg-amber-50 rounded p-2 border border-amber-200 text-xs">
         <p className="text-amber-800">
-          <span className="font-medium">Golub-Welsch:</span> Eigendecomposition{' '}
-          <MathFormula>{'J = V \\Lambda V^T'}</MathFormula> gives nodes (eigenvalues) and
-          weights (from first eigenvector component).
+          <span className="font-medium">Golub-Welsch (theory):</span> Eigendecomposition of{' '}
+          <MathFormula>{'J'}</MathFormula> gives nodes and weights.
+          The implementation achieves the same result via companion matrix QR of the
+          orthogonal polynomials built by Schmidt orthogonalization.
         </p>
       </div>
     </div>
@@ -723,9 +723,10 @@ export function RysInternalsPanel({ result }: RysInternalsPanelProps) {
                 High Quadrature Order Warning
               </h4>
               <p className="text-amber-700 text-sm">
-                For <MathFormula>{`n > 6`}</MathFormula>, the Hankel matrix becomes
-                ill-conditioned in double precision (condition number{' '}
-                <MathFormula>{`\\kappa > 10^{12}`}</MathFormula>). Results may lose accuracy.
+                For <MathFormula>{`n > 6`}</MathFormula>, the underlying moment structure
+                (Hankel matrix) becomes ill-conditioned in double precision (condition number{' '}
+                <MathFormula>{`\\kappa > 10^{12}`}</MathFormula>). The Schmidt orthogonalization
+                and root-finding may lose accuracy.
               </p>
               <p className="text-amber-600 text-sm mt-1">
                 Consider using <MathFormula>{`n \\leq 6`}</MathFormula> for reliable results
@@ -753,7 +754,7 @@ export function RysInternalsPanel({ result }: RysInternalsPanelProps) {
       {/* Algorithm Steps */}
       <div>
         <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-          Algorithm 5.1 Steps (RDK)
+          Algorithm Steps (RDK / libcint)
         </h4>
         <p className="text-xs text-slate-600 mb-2">{methodDetails.description}</p>
         <div className="bg-white rounded p-2 border border-slate-200">
@@ -764,7 +765,7 @@ export function RysInternalsPanel({ result }: RysInternalsPanelProps) {
                 className={`pl-2 border-l-2 ${
                   i === 0
                     ? 'border-blue-400'
-                    : i <= 3
+                    : i <= 1
                       ? 'border-green-400'
                       : 'border-purple-400'
                 }`}
@@ -783,17 +784,17 @@ export function RysInternalsPanel({ result }: RysInternalsPanelProps) {
       </div>
 
       {/* Hankel Matrix (Collapsible) */}
-      <CollapsibleSection title="Hankel Matrix Structure" defaultOpen={false}>
+      <CollapsibleSection title="Hankel Matrix (Theory)" defaultOpen={false}>
         <HankelMatrixDisplay nroots={result.nroots} t={result.t} />
       </CollapsibleSection>
 
-      {/* Cholesky Factorization (Collapsible) */}
-      <CollapsibleSection title="Cholesky Factorization" defaultOpen={false}>
+      {/* Cholesky / Gram-Schmidt (Collapsible) */}
+      <CollapsibleSection title="Gram-Schmidt / Cholesky (Theory)" defaultOpen={false}>
         <CholeskySection />
       </CollapsibleSection>
 
       {/* Jacobi Matrix (Collapsible) */}
-      <CollapsibleSection title="Jacobi Matrix" defaultOpen={false}>
+      <CollapsibleSection title="Jacobi / Companion Matrix (Theory)" defaultOpen={false}>
         <JacobiMatrixDisplay nroots={result.nroots} />
       </CollapsibleSection>
 
@@ -815,23 +816,19 @@ export function RysInternalsPanel({ result }: RysInternalsPanelProps) {
       {/* Golub-Welsch Weight Formula */}
       <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
         <h4 className="text-xs font-semibold text-purple-800 uppercase tracking-wide mb-2">
-          Weight Formula (Golub-Welsch)
+          Weight Formula
         </h4>
-        <MathDisplay>{`w_i = \\mu_0 \\cdot (V_{0i})^2`}</MathDisplay>
+        <MathDisplay>{`w_k = \\frac{1}{\\sum_{j=0}^{n-1} P_j(r_k)^2}`}</MathDisplay>
         <div className="text-xs text-purple-700 mt-2 space-y-1">
           <p>
-            <MathFormula>{'V_{0i}'}</MathFormula> is the{' '}
-            <span className="font-medium">first component</span> (row 0) of the normalized
-            eigenvector for eigenvalue <MathFormula>{'t_i'}</MathFormula>.
-          </p>
-          <p>
-            This corresponds to the constant polynomial term (
-            <MathFormula>{'p_0 = 1/\\sqrt{\\mu_0}'}</MathFormula>).
+            Weights are computed from the orthonormal polynomials <MathFormula>{'P_j'}</MathFormula> evaluated
+            at each root <MathFormula>{'r_k'}</MathFormula>. Since <MathFormula>{'P_0 = 1/\\sqrt{\\mu_0}'}</MathFormula>,
+            this is equivalent to the Golub-Welsch formula{' '}
+            <MathFormula>{'w_i = \\mu_0 \\cdot (V_{0i})^2'}</MathFormula>.
           </p>
           <p className="text-purple-600 italic">
-            Since <MathFormula>{'\\mu_0 > 0'}</MathFormula> and{' '}
-            <MathFormula>{'(V_{0i})^2 > 0'}</MathFormula>, all weights are{' '}
-            <span className="font-medium">strictly positive</span>.
+            All squared terms are positive, so weights are{' '}
+            <span className="font-medium">strictly positive</span> for non-degenerate cases.
           </p>
         </div>
       </div>

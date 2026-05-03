@@ -1,0 +1,138 @@
+{
+  "pyscf_version": "2.11.0",
+  "molecule": "H2",
+  "basis": "sto-3g",
+  "unit": "bohr",
+  "scan_range": {
+    "r_min": 0.5,
+    "r_max": 5.0,
+    "n_points": 20
+  },
+  "points": [
+    {
+      "r_bohr": 0.5,
+      "energy": -0.4033264416544795,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 0.7368421052631579,
+      "energy": -0.8832053056956779,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 0.9736842105263157,
+      "energy": -1.0557600682599793,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 1.2105263157894737,
+      "energy": -1.1114057138245559,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 1.4473684210526314,
+      "energy": -1.1148520028753928,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 1.6842105263157894,
+      "energy": -1.0939047883630815,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 1.9210526315789473,
+      "energy": -1.0614056757440062,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 2.1578947368421053,
+      "energy": -1.023507924387994,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 2.394736842105263,
+      "energy": -0.9835912765104438,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 2.631578947368421,
+      "energy": -0.9438017694368388,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 2.8684210526315788,
+      "energy": -0.9055387031082275,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 3.1052631578947367,
+      "energy": -0.8696624400422022,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 3.3421052631578947,
+      "energy": -0.8366494995219861,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 3.5789473684210527,
+      "energy": -0.8067110327453654,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 3.81578947368421,
+      "energy": -0.7798736555511965,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 4.052631578947368,
+      "energy": -0.7560355168282635,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 4.289473684210526,
+      "energy": -0.7350104704355669,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 4.526315789473684,
+      "energy": -0.716565386010859,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 4.763157894736842,
+      "energy": -0.7004497767206908,
+      "converged": true,
+      "iterations": 2
+    },
+    {
+      "r_bohr": 5.0,
+      "energy": -0.6864159248421309,
+      "converged": true,
+      "iterations": 2
+    }
+  ],
+  "equilibrium": {
+    "r_bohr": 1.3624081770348124,
+    "energy_hartree": -1.1164214903785574,
+    "energy_precise": -1.1174293513968432
+  }
+}

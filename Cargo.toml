@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/qc-core",
     "crates/qc-wasm",
+    "crates/qc-wasm-spectra",
     "crates/qc-io",
 ]
 
@@ -33,6 +34,7 @@ thiserror = "1.0"
 # Numerical
 num-traits = "0.2"
 nalgebra = "0.33"
+libm = "0.2"
 
 # Testing
 approx = "0.5"
@@ -41,8 +43,12 @@ proptest = "1.4"
 [profile.release]
 lto = true
 opt-level = 3
+codegen-units = 1
+strip = "debuginfo"
 
-[profile.release-wasm]
-inherits = "release"
-lto = true
-opt-level = "s"
+# Per-package size optimization for WASM crates
+[profile.release.package.qc-wasm]
+opt-level = "z"
+
+[profile.release.package.qc-wasm-spectra]
+opt-level = "z"

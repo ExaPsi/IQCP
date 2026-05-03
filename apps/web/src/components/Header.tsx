@@ -1,4 +1,5 @@
 import { Link, NavLink } from 'react-router-dom';
+import { ROUTES } from '@/lib/routes';
 
 /**
  * Top navigation link component with keyboard accessibility.
@@ -54,9 +55,9 @@ function Header() {
             className="flex items-center space-x-1"
             aria-label="Primary navigation"
           >
-            <TopNavLink to="/labs">Labs</TopNavLink>
-            <TopNavLink to="/reference">Reference</TopNavLink>
-            <TopNavLink to="/about">About</TopNavLink>
+            <TopNavLink to={ROUTES.LABS}>Labs</TopNavLink>
+            <TopNavLink to={ROUTES.REFERENCE}>Reference</TopNavLink>
+            <TopNavLink to={ROUTES.ABOUT}>About</TopNavLink>
             <a
               href="https://github.com/ExaPsi/IQCP"
               target="_blank"

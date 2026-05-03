@@ -196,12 +196,12 @@ export function setComputeIntegralsWithOptionsAndProgressFn(
 /**
  * Supported element symbols (H through Ne).
  */
-const SUPPORTED_ELEMENTS = ['H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne'];
+const SUPPORTED_ELEMENTS = ['H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar'];
 
 /**
  * Supported basis set names.
  */
-const SUPPORTED_BASIS_SETS: BasisSetName[] = ['sto-3g', '3-21g', '6-31g', '6-31g*', '6-31+g*'];
+const SUPPORTED_BASIS_SETS: BasisSetName[] = ['sto-3g', '3-21g', '6-31g', '6-31g*', '6-31+g*', 'cc-pvdz'];
 
 /**
  * Validate geometry input.
@@ -217,7 +217,7 @@ function validateGeometry(geometry: GeometryInput): string | null {
   for (let i = 0; i < geometry.atoms.length; i++) {
     const atom = geometry.atoms[i];
     if (!SUPPORTED_ELEMENTS.includes(atom.symbol)) {
-      return `Unsupported element '${atom.symbol}' at position ${i}. Only H-Ne are supported.`;
+      return `Unsupported element '${atom.symbol}' at position ${i}. Only H-Ar are supported.`;
     }
     if (!Array.isArray(atom.xyz) || atom.xyz.length !== 3) {
       return `Invalid coordinates for atom ${i} (${atom.symbol}). Expected [x, y, z] array.`;

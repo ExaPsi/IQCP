@@ -1,0 +1,57 @@
+{
+  "format_version": 1,
+  "system_id": "heh_plus_sto3g",
+  "label": "HeH+ (STO-3G)",
+  "description": "Helium hydride ion - heteronuclear diatomic with 2 electrons. Good comparison to H2 as same basis size but different nuclear charges.",
+  "geometry": {
+    "atoms": [
+      {
+        "symbol": "He",
+        "xyz": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "symbol": "H",
+        "xyz": [
+          0.0,
+          0.0,
+          1.4632
+        ]
+      }
+    ],
+    "units": "bohr"
+  },
+  "basis_id": "sto-3g",
+  "nbf": 2,
+  "nelec": 2,
+  "e_nuc": 1.366867140513942,
+  "s_matrix": [
+    1.0000000000000002,
+    0.5368193496887589,
+    0.536819349688759,
+    1.0000000000000002
+  ],
+  "h_core": [
+    -2.5982830075866272,
+    -1.4318285046320312,
+    -1.4318285046320314,
+    -1.731825672645799
+  ],
+  "eri_compressed": [
+    1.0557129427350722,
+    0.4439649874114326,
+    0.22431933879949295,
+    0.5908073084285695,
+    0.36741015713128483,
+    0.7746059439198978
+  ],
+  "eri_indexing": "8-fold symmetry: pair(i,j)=i*(i+1)/2+j, idx(P,Q)=P*(P+1)/2+Q",
+  "reference": {
+    "software": "PySCF",
+    "version": "2.11.0",
+    "energy": -2.8418364992873766
+  }
+}

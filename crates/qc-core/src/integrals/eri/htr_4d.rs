@@ -34,6 +34,12 @@
 
 use super::vrr_2d::get_2d;
 
+// Maximum angular momentum per center for supported basis sets (6-31G* = d=2,
+// plus derivative extension = 3). j+l can reach 6, so bra_size = j+1 <= 4
+// and ket_base_size = (l+1)*(j+1) <= 16. Use generous bounds for safety.
+const MAX_BRA_SIZE: usize = 8; // j+1, covers up to f-shell
+const MAX_KET_BUF_SIZE: usize = 64; // (l+1)*(j+1), covers up to f-shell
+
 /// Apply horizontal transfer to get 1D 4-index integral from 2D table
 ///
 /// # Arguments
@@ -72,7 +78,150 @@ pub fn horizontal_transfer_1d(
     ab: f64,
     cd: f64,
 ) -> f64 {
-    horizontal_transfer_recursive(g, n_ket, i, j, k, l, ab, cd)
+    // Fast paths for the most common cases (avoid function call overhead)
+    if j == 0 && l == 0 {
+        return get_2d(g, n_ket, i, k);
+    }
+
+    // For small j+l (covers s, p, and most d-orbital cases), the recursive
+    // version has minimal overhead and no heap allocation.
+    // For j+l <= 4 (d-orbital derivatives), recursion is at most ~16 calls.
+    if j + l <= 4 {
+        return horizontal_transfer_recursive(g, n_ket, i, j, k, l, ab, cd);
+    }
+
+    // For larger angular momentum, use iterative approach with stack arrays
+    horizontal_transfer_iterative_impl(g, n_ket, i, j, k, l, ab, cd)
+}
+
+/// Iterative horizontal transfer for larger angular momentum.
+///
+/// Uses a two-phase approach:
+/// 1. Ket transfer: for each bra index n, transfer l angular momentum from
+///    the combined index m=(k+l) to separate (k, l) using the relation
+///    [n,k,l] = [n,k+1,l-1] + cd*[n,k,l-1]
+/// 2. Bra transfer: for fixed (k, l), transfer j angular momentum from
+///    the combined index n=(i+j) to separate (i, j) using the relation
+///    [i,j,k,l] = [i+1,j-1,k,l] + ab*[i,j-1,k,l]
+#[allow(clippy::too_many_arguments)]
+fn horizontal_transfer_iterative_impl(
+    g: &[f64],
+    n_ket: usize,
+    i: usize,
+    j: usize,
+    k: usize,
+    l: usize,
+    ab: f64,
+    cd: f64,
+) -> f64 {
+    let n = i + j;
+
+    // Phase 1: Ket transfer -- reduce l to 0
+    // We need h[nn][k] for nn = i..=n (i.e., j+1 values)
+    // Start from h[nn][k+l-ll] for ll=0 (i.e., h[nn][k+l] = g[nn][k+l])
+    // Work down to ll=l (h[nn][k])
+
+    // Allocate working arrays on the stack for bra indices we need.
+    // We need values for nn in i..=n, which is j+1 values.
+    // At the start of ket transfer, we need values for m from k to k+l.
+    // After each ket step, the range shrinks by 1.
+
+    // Work buffer: prev_row[nn-i] for nn = i..=n
+    // Stack-allocated to avoid heap allocation in the hot path
+    let bra_size = j + 1;
+    debug_assert!(
+        bra_size <= MAX_BRA_SIZE,
+        "bra_size {} exceeds MAX_BRA_SIZE {}",
+        bra_size,
+        MAX_BRA_SIZE
+    );
+    let mut prev = [0.0f64; MAX_BRA_SIZE]; // h[nn][current_m_start]
+    let mut curr = [0.0f64; MAX_BRA_SIZE]; // h[nn][current_m_start+1]
+
+    if l == 0 {
+        // No ket transfer needed -- just read g[nn][k]
+        for (idx, nn) in (i..=n).enumerate() {
+            prev[idx] = get_2d(g, n_ket, nn, k);
+        }
+    } else {
+        // Initialize: h[nn][k+l] = g[nn][k+l] for nn = i..=n
+        // and h[nn][k+l-1] = g[nn][k+l-1] for nn = i..=n
+        // Actually, we need to apply ket HTR l times.
+
+        // After ket HTR, we have h[nn][k] where:
+        // h[nn][kk] for step-0: = g[nn][kk] (m = kk, l = 0)
+        // h[nn][kk] for step-ll: [nn, kk, ll] = [nn, kk+1, ll-1] + cd * [nn, kk, ll-1]
+
+        // We need two "layers" of the ket index for each step.
+
+        // Base: ll=0 -> all values are just g[nn][m] for m = k to k+l
+        // Step ll=1: h[nn][kk,1] = g[nn][kk+1] + cd * g[nn][kk] for kk = k to k+l-1
+        // ...
+        // Step ll=l: h[nn][k,l] = desired value
+
+        // At step ll, we need values at ket indices k to k+l-ll.
+        // At step ll+1, we need k to k+l-ll-1.
+
+        // Use two buffers: one for current ll, one for ll-1.
+        // Each buffer stores values at ket indices k to k+(l-ll) for each nn.
+        // Stack-allocated to avoid heap allocation in the hot path
+
+        let ket_base_size = (l + 1) * bra_size; // max size needed
+        debug_assert!(
+            ket_base_size <= MAX_KET_BUF_SIZE,
+            "ket_base_size {} exceeds MAX_KET_BUF_SIZE {}",
+            ket_base_size,
+            MAX_KET_BUF_SIZE
+        );
+        let mut ket_prev = [0.0f64; MAX_KET_BUF_SIZE]; // ll-1 layer
+        let mut ket_curr = [0.0f64; MAX_KET_BUF_SIZE]; // ll layer
+
+        // Initialize ll=0: ket_prev[nn_idx * (l+1) + (kk - k)] = g[nn][kk]
+        for (nn_idx, nn) in (i..=n).enumerate() {
+            for kk in k..=(k + l) {
+                ket_prev[nn_idx * (l + 1) + (kk - k)] = get_2d(g, n_ket, nn, kk);
+            }
+        }
+
+        // Apply ket HTR l times
+        for ll in 1..=l {
+            let ket_range = l - ll + 1; // number of ket values at this step
+            for (nn_idx, _nn) in (i..=n).enumerate() {
+                for kk_off in 0..ket_range {
+                    // [nn, k+kk_off, ll] = [nn, k+kk_off+1, ll-1] + cd * [nn, k+kk_off, ll-1]
+                    ket_curr[nn_idx * (l + 1) + kk_off] = ket_prev[nn_idx * (l + 1) + kk_off + 1]
+                        + cd * ket_prev[nn_idx * (l + 1) + kk_off];
+                }
+            }
+            std::mem::swap(&mut ket_prev, &mut ket_curr);
+        }
+
+        // After l steps, ket_prev[nn_idx * (l+1) + 0] = h[nn][k][l]
+        for (idx, _nn) in (i..=n).enumerate() {
+            prev[idx] = ket_prev[idx * (l + 1)];
+        }
+    }
+
+    // Phase 2: Bra transfer -- reduce j to 0
+    // prev[nn_idx] = h[nn][k][l] for nn = i..=n (nn_idx = nn - i)
+    // Apply: h[ii, jj] = h[ii+1, jj-1] + ab * h[ii, jj-1]
+    // where h[nn, 0] = prev[nn-i]
+
+    if j == 0 {
+        return prev[0]; // h[i][0] = h[i][k][l]
+    }
+
+    // j steps of bra HTR, reducing the working set by 1 each time
+    for jj in 1..=j {
+        let new_size = j + 1 - jj;
+        for ii_off in 0..new_size {
+            // [i+ii_off, jj, k, l] = [i+ii_off+1, jj-1, k, l] + ab * [i+ii_off, jj-1, k, l]
+            curr[ii_off] = prev[ii_off + 1] + ab * prev[ii_off];
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+
+    prev[0]
 }
 
 /// Apply horizontal transfer to get 1D 4-index integral from 2D table

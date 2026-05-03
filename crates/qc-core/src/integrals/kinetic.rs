@@ -82,7 +82,7 @@ use crate::basis::{BasisSet, ContractedShell};
 ///
 /// Obara & Saika (1986), Eq. 3.22
 #[inline]
-fn kinetic_1d(pa: f64, ab: f64, one_over_2p: f64, a: i32, b: i32, beta: f64) -> f64 {
+pub(crate) fn kinetic_1d(pa: f64, ab: f64, one_over_2p: f64, a: i32, b: i32, beta: f64) -> f64 {
     // Term 1: -2*beta^2 * S_1D(a, b+2)
     let term1 = -2.0 * beta * beta * overlap_1d(pa, ab, one_over_2p, a, b + 2);
 

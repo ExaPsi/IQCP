@@ -94,9 +94,9 @@ function ConvergenceTheoryNote() {
       <div className="bg-amber-50 rounded p-2 mt-3 border border-amber-200">
         <p className="text-xs text-amber-700">
           <strong>Numerical Warning:</strong> For very high orders (<Math>{'n > 6'}</Math>),
-          numerical conditioning may limit achievable accuracy. The Jacobi matrix eigenvalue
-          problem becomes increasingly sensitive, and roundoff errors may prevent reaching
-          theoretical precision.
+          numerical conditioning may limit achievable accuracy. The Schmidt orthogonalization
+          and polynomial root-finding become increasingly sensitive, and roundoff errors may
+          prevent reaching theoretical precision.
         </p>
       </div>
     </div>
@@ -319,6 +319,7 @@ function ErrorCurveSection() {
                 <RysErrorChart
                   errorCurve={errorCurve.result}
                   target={target}
+                  T={T}
                   loading={false}
                 />
                 {/* Chart legend explanation */}

@@ -1,0 +1,19 @@
+{
+  "description": "Cross-browser determinism verification — Float64 hex comparison",
+  "date": "2026-03-28T06:00:00Z",
+  "browsers": ["Chrome", "Firefox", "Safari"],
+  "platform": "MacIntel",
+  "result": "ALL IDENTICAL — 9/9 calculations bit-identical across 3 browsers",
+  "note": "Updated from 2026-03-28 benchmark run: expanded from 5 to 9 test cases (3 RHF + 6 B3LYP)",
+  "systems": [
+    {"system": "RHF H2/STO-3G",      "hex": "bff1de0fd711e4d6", "match": true},
+    {"system": "RHF H2O/STO-3G",     "hex": "c052bda2369e846f", "match": true},
+    {"system": "RHF NH3/STO-3G",     "hex": "c04bba2885d7e18c", "match": true},
+    {"system": "B3LYP H2/6-31G*",    "hex": "bff2b30eec9c8530", "match": true},
+    {"system": "B3LYP HF/6-31G*",    "hex": "c059187482bbbad9", "match": true},
+    {"system": "B3LYP H2O/6-31G*",   "hex": "c05317c81a12d9be", "match": true},
+    {"system": "B3LYP NH3/6-31G*",   "hex": "c04c4173a5515d04", "match": true},
+    {"system": "B3LYP CH4/6-31G*",   "hex": "c0443dbbe1e814fc", "match": true},
+    {"system": "B3LYP C6H6/6-31G*",  "hex": "c06d030479eaae4a", "match": true}
+  ]
+}

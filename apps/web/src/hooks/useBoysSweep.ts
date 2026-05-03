@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useCallback } from 'react';
 import { useWorker } from './useWorker';
 import { useBoysStore } from '../stores/boysStore';
+import { getMaxTValue } from '../lib/boysConstants';
 import type { BoysSweepResult, BoysSweepRequest } from '../worker/protocol';
 
 /**
@@ -67,9 +68,9 @@ const SWEEP_DEBOUNCE_MS = 100;
 /**
  * Default sweep parameters.
  *
- * T range from 0 to 50 with 200 points for smooth curves.
+ * Number of points for smooth curves (fixed).
+ * T range is dynamic based on m via getMaxTValue(m).
  */
-const SWEEP_T_RANGE: [number, number] = [0, 50];
 const SWEEP_POINTS = 200;
 
 /**
@@ -118,7 +119,7 @@ export function useBoysSweep(): UseBoysSweepResult {
         const request: Omit<BoysSweepRequest, 'requestId'> = {
           type: 'boys_sweep',
           m: computeM,
-          T_range: SWEEP_T_RANGE,
+          T_range: [0, getMaxTValue(computeM)],
           points: SWEEP_POINTS,
         };
         const result = await send<BoysSweepResult>(request);

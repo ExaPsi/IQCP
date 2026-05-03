@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react-swc';
 import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 import path from 'path';
+import { readFileSync } from 'fs';
 
 // Custom plugin for COOP/COEP headers - enables SharedArrayBuffer for WASM threading
 // NOTE: These headers break browser extensions (MetaMask, etc.)
@@ -13,18 +14,21 @@ const coopCoepPlugin = (): Plugin => ({
     console.log('[COOP/COEP] Installing cross-origin isolation headers middleware');
     server.middlewares.use((_req, res, next) => {
       res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-      res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+      res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
       next();
     });
   },
   configurePreviewServer(server) {
     server.middlewares.use((_req, res, next) => {
       res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-      res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+      res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
       next();
     });
   },
 });
+
+// Read version from package.json for build-time injection
+const pkg = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -34,6 +38,9 @@ export default defineConfig({
     wasm(),
     topLevelAwait(),
   ],
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   assetsInclude: ['**/*.md'],
   resolve: {
     alias: {
@@ -42,12 +49,26 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Phase 2 (US-035): Code-split Three.js and R3F into a separate chunk
+          // that is only loaded when the 3D molecular viewer is activated.
+          // This keeps the initial Module C bundle small.
+          'viewer3d': [
+            'three',
+            '@react-three/fiber',
+            '@react-three/drei',
+          ],
+        },
+      },
+    },
   },
   worker: {
     format: 'es',
     plugins: () => [wasm(), topLevelAwait()],
   },
   optimizeDeps: {
-    exclude: ['qc-wasm'],
+    exclude: ['qc-wasm', 'qc-wasm-spectra'],
   },
 });

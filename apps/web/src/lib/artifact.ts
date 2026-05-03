@@ -452,8 +452,8 @@ export function restoreArtifact(artifact: RunArtifactV1): RestoreResult {
         rysStore.setT(rysParams.T);
         rysStore.setTarget(rysParams.target as TargetAccuracy);
 
-        // Restore UI mode if present
-        if (state.ui?.mode) {
+        // Restore UI mode if present (rys only supports explain/internals)
+        if (state.ui?.mode && (state.ui.mode === 'explain' || state.ui.mode === 'internals')) {
           rysStore.setMode(state.ui.mode);
         }
 
@@ -492,8 +492,8 @@ export function restoreArtifact(artifact: RunArtifactV1): RestoreResult {
         scfStore.setMaxIterations(scfParams.max_iter);
         scfStore.setUseDiis(scfParams.diis);
 
-        // Restore UI mode if present
-        if (state.ui?.mode) {
+        // Restore UI mode if present (scf only supports explain/internals)
+        if (state.ui?.mode && (state.ui.mode === 'explain' || state.ui.mode === 'internals')) {
           scfStore.setMode(state.ui.mode);
         }
 

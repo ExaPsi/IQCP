@@ -131,16 +131,17 @@ export function GeometryEditor({
         </div>
       </div>
 
-      {/* Textarea */}
+      {/* Textarea — nowrap prevents coordinate columns from breaking mid-line */}
       <textarea
         id="geometry-editor"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         placeholder={placeholder}
-        rows={6}
+        rows={8}
+        wrap="off"
         spellCheck={false}
-        className={`w-full px-3 py-2 font-mono text-sm border rounded-lg bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y ${borderColor} ${
+        className={`w-full px-2 py-1.5 font-mono text-[11px] leading-5 border rounded-lg bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y overflow-x-auto ${borderColor} ${
           disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''
         }`}
         aria-label="XYZ geometry input"
@@ -226,7 +227,7 @@ export function GeometryEditor({
       <p className="mt-2 text-xs text-slate-500">
         Enter one atom per line: <code className="bg-slate-100 px-1 rounded">Element X Y Z</code>
         {' '}(e.g., <code className="bg-slate-100 px-1 rounded">H 0.0 0.0 0.0</code>).
-        Supported elements: H-Ne. Maximum 15 atoms.
+        Supported elements: H-Ar. Maximum 15 atoms.
       </p>
     </div>
   );

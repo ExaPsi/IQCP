@@ -61,6 +61,8 @@ interface ScfWasmMatrices {
   fockMatrix: number[];
   /** Final density matrix D (row-major, nbf x nbf) */
   densityMatrix: number[];
+  /** MO coefficient matrix C (row-major, nbf x nbf) */
+  moCoefficients: number[];
 }
 
 /**
@@ -192,6 +194,7 @@ export function handleScfRun(
     diisSize: options.diisSize,
     includeMatrices: options.includeMatrices ?? false,
     damp: options.damp,
+    levelShift: options.levelShift,
   };
 
   // 3. Call WASM SCF function
@@ -277,6 +280,7 @@ export function handleScfRun(
       hCore: result.matrices.hCore,
       fockMatrix: result.matrices.fockMatrix,
       densityMatrix: result.matrices.densityMatrix,
+      moCoefficients: result.matrices.moCoefficients,
     };
   }
 

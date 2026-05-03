@@ -215,7 +215,110 @@ impl GaussianProduct2e {
 
         // Prefactor: 2 * pi^(5/2) / (p * q * sqrt(p + q)) * K_ij * K_kl
         // Reference: libcint g2e.c line 4441
-        let prefactor = 2.0 * PI.powf(2.5) / (p * q * (p + q).sqrt()) * k_ij * k_kl;
+        // pi^(5/2) = pi^2 * sqrt(pi), avoids powf()
+        let prefactor = 2.0 * PI * PI * PI.sqrt() / (p * q * (p + q).sqrt()) * k_ij * k_kl;
+
+        Self {
+            p,
+            center_p,
+            pa,
+            ab,
+            k_ij,
+            q,
+            center_q,
+            qc,
+            cd,
+            k_kl,
+            pq,
+            pq_squared,
+            rho,
+            t,
+            prefactor,
+            one_over_2p,
+            one_over_2q,
+        }
+    }
+
+    /// Fast constructor that accepts pre-computed shell pair data.
+    ///
+    /// Avoids recomputing |A-B|², |C-D|², AB, CD vectors, and exp() calls
+    /// for K_ij and K_kl, which are constant across all primitive quartets
+    /// within a shell quartet (or depend only on the bra/ket pair).
+    ///
+    /// # Arguments
+    ///
+    /// * `alpha_i`, `alpha_j` - Bra primitive exponents
+    /// * `center_a`, `center_b` - Bra primitive centers
+    /// * `alpha_k`, `alpha_l` - Ket primitive exponents
+    /// * `center_c`, `center_d` - Ket primitive centers
+    /// * `ab` - Pre-computed A - B vector
+    /// * `cd` - Pre-computed C - D vector
+    /// * `k_ij` - Pre-computed exp(-mu_ij * |A-B|²)
+    /// * `k_kl` - Pre-computed exp(-mu_kl * |C-D|²)
+    #[allow(clippy::too_many_arguments)]
+    #[inline]
+    pub fn new_prescreened(
+        alpha_i: f64,
+        center_a: &[f64; 3],
+        alpha_j: f64,
+        center_b: &[f64; 3],
+        alpha_k: f64,
+        center_c: &[f64; 3],
+        alpha_l: f64,
+        center_d: &[f64; 3],
+        ab: [f64; 3],
+        cd: [f64; 3],
+        k_ij: f64,
+        k_kl: f64,
+    ) -> Self {
+        // === Bra pair (i, j) ===
+        let p = alpha_i + alpha_j;
+        let one_over_2p = 0.5 / p;
+
+        // Product center P
+        let center_p = [
+            (alpha_i * center_a[0] + alpha_j * center_b[0]) / p,
+            (alpha_i * center_a[1] + alpha_j * center_b[1]) / p,
+            (alpha_i * center_a[2] + alpha_j * center_b[2]) / p,
+        ];
+
+        // PA = P - A
+        let pa = [
+            center_p[0] - center_a[0],
+            center_p[1] - center_a[1],
+            center_p[2] - center_a[2],
+        ];
+
+        // === Ket pair (k, l) ===
+        let q = alpha_k + alpha_l;
+        let one_over_2q = 0.5 / q;
+
+        // Product center Q
+        let center_q = [
+            (alpha_k * center_c[0] + alpha_l * center_d[0]) / q,
+            (alpha_k * center_c[1] + alpha_l * center_d[1]) / q,
+            (alpha_k * center_c[2] + alpha_l * center_d[2]) / q,
+        ];
+
+        // QC = Q - C
+        let qc = [
+            center_q[0] - center_c[0],
+            center_q[1] - center_c[1],
+            center_q[2] - center_c[2],
+        ];
+
+        // === Combined quantities ===
+        let pq = [
+            center_p[0] - center_q[0],
+            center_p[1] - center_q[1],
+            center_p[2] - center_q[2],
+        ];
+        let pq_squared = pq[0] * pq[0] + pq[1] * pq[1] + pq[2] * pq[2];
+        let rho = p * q / (p + q);
+        let t = rho * pq_squared;
+
+        // pi^(5/2) = pi^2 * sqrt(pi)
+        let prefactor = 2.0 * PI * PI * PI.sqrt() / (p * q * (p + q).sqrt()) * k_ij * k_kl;
 
         Self {
             p,

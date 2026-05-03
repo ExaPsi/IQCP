@@ -118,6 +118,83 @@ pub fn build_2d(
     g
 }
 
+/// Build the 2D VRR integral table into a pre-allocated buffer.
+///
+/// Same algorithm as `build_2d` but avoids heap allocation by writing
+/// into the caller's buffer. The buffer must have at least
+/// `(n_bra + 1) * (n_ket + 1)` elements; only those elements are written.
+///
+/// # Arguments
+///
+/// * `g` - Pre-allocated output buffer (must be large enough)
+/// * `n_bra` - Maximum angular momentum on bra side
+/// * `n_ket` - Maximum angular momentum on ket side
+/// * `c00` - Center offset coefficient for bra recurrence
+/// * `c0p` - Center offset coefficient for ket recurrence
+/// * `b00` - Cross-term coupling coefficient
+/// * `b10` - Bra recurrence coefficient
+/// * `b01` - Ket recurrence coefficient
+///
+/// # Returns
+///
+/// The number of elements written: `(n_bra + 1) * (n_ket + 1)`
+#[inline]
+#[allow(clippy::too_many_arguments)]
+pub fn build_2d_into(
+    g: &mut [f64],
+    n_bra: usize,
+    n_ket: usize,
+    c00: f64,
+    c0p: f64,
+    b00: f64,
+    b10: f64,
+    b01: f64,
+) -> usize {
+    let rows = n_bra + 1;
+    let cols = n_ket + 1;
+    let size = rows * cols;
+
+    // Zero out the used portion
+    for v in &mut g[..size] {
+        *v = 0.0;
+    }
+
+    // Base case: [0, 0] = 1.0
+    g[0] = 1.0;
+
+    if n_bra == 0 && n_ket == 0 {
+        return size;
+    }
+
+    // Build the first column (m = 0) using bra recurrence
+    if n_bra > 0 {
+        g[cols] = c00;
+        for n in 1..n_bra {
+            g[(n + 1) * cols] = c00 * g[n * cols] + (n as f64) * b10 * g[(n - 1) * cols];
+        }
+    }
+
+    // Build rows (m > 0) using ket recurrence
+    for m in 0..n_ket {
+        if m == 0 {
+            g[m + 1] = c0p * g[0];
+        } else {
+            g[m + 1] = c0p * g[m] + (m as f64) * b01 * g[m - 1];
+        }
+
+        for n in 1..=n_bra {
+            let g_n_m = g[n * cols + m];
+            let g_n_m_minus_1 = if m > 0 { g[n * cols + m - 1] } else { 0.0 };
+            let g_n_minus_1_m = g[(n - 1) * cols + m];
+
+            g[n * cols + m + 1] =
+                c0p * g_n_m + (m as f64) * b01 * g_n_m_minus_1 + (n as f64) * b00 * g_n_minus_1_m;
+        }
+    }
+
+    size
+}
+
 /// Get value from 2D VRR table
 ///
 /// # Arguments

@@ -1,0 +1,11 @@
+{
+  "description": "WASM load time and time-to-interactive — all 3 browsers",
+  "date": "2026-03-28T06:00:00Z",
+  "platform": "MacIntel (via VS Code port-forwarded dev server)",
+  "note": "Updated from 2026-03-28 benchmark run",
+  "results": {
+    "chrome":  { "wasm_init_ms": 41, "ttfc_ms": 7, "tti_ms": 48 },
+    "firefox": { "wasm_init_ms": 14, "ttfc_ms": 8, "tti_ms": 23 },
+    "safari":  { "wasm_init_ms": 10, "ttfc_ms": 48, "tti_ms": 58 }
+  }
+}

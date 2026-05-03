@@ -1,0 +1,16 @@
+{
+  "browser": "Safari",
+  "platform": "MacIntel",
+  "date": "2026-03-28T06:01:05Z",
+  "method": "B3LYP",
+  "basis": "6-31g*",
+  "grid": "SG-1 (standard: [6,38,86,194,86]), Mura-Knowles radial, 75 radial points",
+  "benchmarks": [
+    {"molecule": "H2",   "n_basis": 4,   "runs": 10, "mean_ms": 25.6,    "std_ms": 1.0},
+    {"molecule": "HF",   "n_basis": 17,  "runs": 5,  "mean_ms": 123.0,   "std_ms": 1.3},
+    {"molecule": "H2O",  "n_basis": 19,  "runs": 5,  "mean_ms": 185.2,   "std_ms": 1.2},
+    {"molecule": "NH3",  "n_basis": 21,  "runs": 5,  "mean_ms": 283.4,   "std_ms": 3.6},
+    {"molecule": "CH4",  "n_basis": 23,  "runs": 5,  "mean_ms": 555.6,   "std_ms": 1.4},
+    {"molecule": "C6H6", "n_basis": 102, "runs": 3,  "mean_ms": 29206.0, "std_ms": 67.3}
+  ]
+}

@@ -10,15 +10,17 @@
 
 import { useBoysStore } from '../../stores/boysStore';
 import { useBoysSweep } from '../../hooks/useBoysSweep';
+import { useBoysEvalAll } from '../../hooks/useBoysEvalAll';
 import { BoysChart } from './BoysChart';
 import { BoysInternalsPanel } from './BoysInternalsPanel';
+import { BoysMultiOrderPanel } from './BoysMultiOrderPanel';
 import { Math as MathInline } from '../common';
 import type { BoysMethod } from '../../worker/protocol';
 import {
   getTurnoverPoint,
   getAsymptoticThreshold,
   THEORETICAL_SMALL_T_THRESHOLD,
-  MAX_T_VALUE,
+  getMaxTValue,
   THEORETICAL_FORMULAS,
 } from '../../lib/boysConstants';
 
@@ -191,7 +193,7 @@ function SingleResultDisplay() {
           {/* Main result */}
           <div className="bg-slate-50 rounded-lg p-4">
             <div className="text-sm text-slate-600 mb-1">
-              <MathInline>{`F_{${m}}(${T.toFixed(1)}) =`}</MathInline>
+              <MathInline>{`F_{${m}}(${Number.isInteger(T) ? T.toFixed(1) : T}) =`}</MathInline>
             </div>
             <div className="text-2xl font-mono text-slate-900 break-all">
               {formatScientific(compute.result.value)}
@@ -269,6 +271,7 @@ function SweepResultDisplay() {
         sweepData={sweepData}
         logScale={logScale}
         currentT={T}
+        m={m}
         loading={isComputing || sweepStatus === 'pending'}
         error={sweepError}
       />
@@ -375,7 +378,7 @@ function SweepResultDisplay() {
               </ul>
             )}
 
-            {turnover > 0 && turnover < MAX_T_VALUE && (
+            {turnover > 0 && turnover < getMaxTValue(m) && (
               <p className="text-xs text-amber-600 mt-1">
                 The solid gray line at <MathInline>{`T=${turnover.toFixed(2)}`}</MathInline> shows this boundary.
               </p>
@@ -388,8 +391,8 @@ function SweepResultDisplay() {
 
           <p className="text-xs text-slate-500 mt-3">
             The asymptotic threshold (<MathInline>{`30+5m`}</MathInline>) for <MathInline>{`m=${m}`}</MathInline> is <MathInline>{`T=${getAsymptoticThreshold(m)}`}</MathInline>.
-            {getAsymptoticThreshold(m) > MAX_T_VALUE && (
-              <> This is beyond the chart range (<MathInline>{`T < ${MAX_T_VALUE}`}</MathInline>), so only Small and Moderate regimes are visible.</>
+            {getAsymptoticThreshold(m) > getMaxTValue(m) && (
+              <> This is beyond the chart range (<MathInline>{`T < ${getMaxTValue(m)}`}</MathInline>), so only Small and Moderate regimes are visible.</>
             )}
             {' '}The red line marks the current <MathInline>T</MathInline> value ({T.toFixed(1)}).
           </p>
@@ -418,11 +421,37 @@ function SweepResultDisplay() {
 }
 
 /**
+ * Multi-order result display (F_0..F_m at fixed T).
+ *
+ * Shows a bar chart and table comparing Boys function values
+ * across all orders from 0 to m at the current T value.
+ */
+function MultiOrderResultDisplay() {
+  const T = useBoysStore((state) => state.T);
+  const multiOrderData = useBoysStore((state) => state.multiOrderData);
+  const multiOrderStatus = useBoysStore((state) => state.multiOrderStatus);
+  const multiOrderError = useBoysStore((state) => state.multiOrderError);
+
+  // Use the multi-order hook to trigger computations
+  const { isComputing } = useBoysEvalAll();
+
+  return (
+    <BoysMultiOrderPanel
+      data={multiOrderData}
+      loading={isComputing || multiOrderStatus === 'pending'}
+      error={multiOrderError}
+      currentT={T}
+    />
+  );
+}
+
+/**
  * Display area for Boys function computation results.
  *
  * Shows:
  * - Single view: Loading state, error state, success with value and method
  * - Sweep view: Interactive chart with regime annotations
+ * - Multi-order mode: Bar chart + table of F_0..F_m at fixed T
  *
  * @example
  * ```tsx
@@ -431,6 +460,12 @@ function SweepResultDisplay() {
  */
 export function BoysResultDisplay() {
   const view = useBoysStore((state) => state.view);
+  const mode = useBoysStore((state) => state.mode);
+
+  // Multi-order mode overrides view selection
+  if (mode === 'multi-order') {
+    return <MultiOrderResultDisplay />;
+  }
 
   if (view === 'sweep') {
     return <SweepResultDisplay />;

@@ -1,0 +1,108 @@
+{
+  "browser": "Safari",
+  "platform": "MacIntel",
+  "date": "2026-03-28T06:00:00Z",
+  "load_times": {
+    "wasm_init_ms": 10,
+    "time_to_first_calculation_ms": 48,
+    "time_to_interactive_ms": 58
+  },
+  "benchmarks": [
+    {
+      "system": "H2/STO-3G",
+      "method": "RHF",
+      "n_basis": 2,
+      "mean_ms": 0.3,
+      "std_ms": 0.46,
+      "n_runs": 20
+    },
+    {
+      "system": "H2O/STO-3G",
+      "method": "RHF",
+      "n_basis": 7,
+      "mean_ms": 0.55,
+      "std_ms": 0.5,
+      "n_runs": 20
+    },
+    {
+      "system": "NH3/STO-3G",
+      "method": "RHF",
+      "n_basis": 8,
+      "mean_ms": 0.4,
+      "std_ms": 0.49,
+      "n_runs": 20
+    },
+    {
+      "system": "H2O/STO-3G",
+      "method": "B3LYP",
+      "n_basis": 7,
+      "mean_ms": 91.2,
+      "std_ms": 2.2,
+      "n_runs": 5
+    },
+    {
+      "system": "H2O/6-31G*",
+      "method": "B3LYP",
+      "n_basis": 19,
+      "mean_ms": 223.8,
+      "std_ms": 2.3,
+      "n_runs": 5
+    }
+  ],
+  "determinism": [
+    {
+      "system": "RHF H2/STO-3G",
+      "energy": -1.116714325063,
+      "hex": "bff1de0fd711e4d6",
+      "iterations": 1
+    },
+    {
+      "system": "RHF H2O/STO-3G",
+      "energy": -74.963025717547,
+      "hex": "c052bda2369e846f",
+      "iterations": 8
+    },
+    {
+      "system": "RHF NH3/STO-3G",
+      "energy": -55.454361658488,
+      "hex": "c04bba2885d7e18c",
+      "iterations": 9
+    },
+    {
+      "system": "B3LYP H2/6-31G*",
+      "energy": -1.168715404762,
+      "hex": "bff2b30eec9c8530",
+      "iterations": 4
+    },
+    {
+      "system": "B3LYP HF/6-31G*",
+      "energy": -100.382111247377,
+      "hex": "c059187482bbbad9",
+      "iterations": 9
+    },
+    {
+      "system": "B3LYP H2O/6-31G*",
+      "energy": -76.371588247689,
+      "hex": "c05317c81a12d9be",
+      "iterations": 9
+    },
+    {
+      "system": "B3LYP NH3/6-31G*",
+      "energy": -56.511339518788,
+      "hex": "c04c417392c72c88",
+      "iterations": 10
+    },
+    {
+      "system": "B3LYP CH4/6-31G*",
+      "energy": -40.482296217271,
+      "hex": "c0443dbbe1e814fc",
+      "iterations": 20
+    },
+    {
+      "system": "B3LYP C6H6/6-31G*",
+      "energy": -232.094296415673,
+      "hex": "c06d030479eaae4a",
+      "iterations": 9
+    }
+  ]
+}

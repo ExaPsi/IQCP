@@ -66,6 +66,12 @@ const BASIS_SETS: BasisSetInfo[] = [
     description: 'With diffuse sp + d polarization (good for anions)',
     cost: 5,
   },
+  {
+    value: 'cc-pvdz',
+    label: 'cc-pVDZ',
+    description: 'Correlation-consistent double-zeta with polarization',
+    cost: 4,
+  },
 ];
 
 /**

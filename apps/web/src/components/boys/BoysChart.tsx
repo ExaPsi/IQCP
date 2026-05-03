@@ -15,19 +15,25 @@
  * @module components/boys/BoysChart
  */
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
+import Plotly from 'plotly.js-cartesian-dist';
 import { PlotPanel } from '../common';
 import type { Data, Layout, Shape, Annotations } from 'plotly.js';
 import type { BoysSweepResult } from '../../worker/protocol';
 import {
   getTurnoverPoint,
   getAsymptoticThreshold,
-  MAX_T_VALUE,
+  getMaxTValue,
   THEORETICAL_SMALL_T_THRESHOLD,
 } from '../../lib/boysConstants';
 
 // Use Plotly's Annotations type for individual annotation objects
 type PlotlyAnnotation = Annotations;
+
+/**
+ * Plotly div ID for SVG export.
+ */
+const SWEEP_PLOT_DIV_ID = 'boys-sweep-plot';
 
 /**
  * Props for BoysChart component.
@@ -39,6 +45,8 @@ export interface BoysChartProps {
   logScale: boolean;
   /** Current T value for vertical marker */
   currentT: number;
+  /** Current order m (for dynamic T range) */
+  m?: number;
   /** Whether sweep is loading */
   loading?: boolean;
   /** Error message to display */
@@ -71,7 +79,7 @@ const THEORETICAL_REGIME_COLORS = {
  * @param turnover - The m-dependent turnover point (implementation boundary)
  * @param m - The current order m
  */
-function createRegimeShapes(turnover: number, m: number): Partial<Shape>[] {
+function createRegimeShapes(turnover: number, m: number, maxT: number): Partial<Shape>[] {
   const shapes: Partial<Shape>[] = [];
 
   // Calculate thresholds
@@ -85,7 +93,7 @@ function createRegimeShapes(turnover: number, m: number): Partial<Shape>[] {
       xref: 'x',
       yref: 'paper',
       x0: 0,
-      x1: Math.min(smallTThreshold, MAX_T_VALUE),
+      x1: Math.min(smallTThreshold, maxT),
       y0: 0,
       y1: 1,
       fillcolor: THEORETICAL_REGIME_COLORS.small,
@@ -95,8 +103,8 @@ function createRegimeShapes(turnover: number, m: number): Partial<Shape>[] {
   }
 
   // Moderate T regime (25 <= T < 30+5m) - erf + recurrence (green)
-  if (smallTThreshold < MAX_T_VALUE) {
-    const moderateEnd = Math.min(asymptoticThreshold, MAX_T_VALUE);
+  if (smallTThreshold < maxT) {
+    const moderateEnd = Math.min(asymptoticThreshold, maxT);
     if (smallTThreshold < moderateEnd) {
       shapes.push({
         type: 'rect',
@@ -115,13 +123,13 @@ function createRegimeShapes(turnover: number, m: number): Partial<Shape>[] {
 
   // Large T regime (T > 30+5m) - Asymptotic (purple)
   // Only show if asymptotic threshold is within visible range
-  if (asymptoticThreshold < MAX_T_VALUE) {
+  if (asymptoticThreshold < maxT) {
     shapes.push({
       type: 'rect',
       xref: 'x',
       yref: 'paper',
       x0: asymptoticThreshold,
-      x1: MAX_T_VALUE,
+      x1: maxT,
       y0: 0,
       y1: 1,
       fillcolor: THEORETICAL_REGIME_COLORS.large,
@@ -131,7 +139,7 @@ function createRegimeShapes(turnover: number, m: number): Partial<Shape>[] {
   }
 
   // Vertical line at theoretical Small T threshold (T=25)
-  if (smallTThreshold > 0 && smallTThreshold < MAX_T_VALUE) {
+  if (smallTThreshold > 0 && smallTThreshold < maxT) {
     shapes.push({
       type: 'line',
       xref: 'x',
@@ -149,7 +157,7 @@ function createRegimeShapes(turnover: number, m: number): Partial<Shape>[] {
   }
 
   // Vertical line at asymptotic threshold (30+5m) if within visible range
-  if (asymptoticThreshold < MAX_T_VALUE) {
+  if (asymptoticThreshold < maxT) {
     shapes.push({
       type: 'line',
       xref: 'x',
@@ -167,7 +175,7 @@ function createRegimeShapes(turnover: number, m: number): Partial<Shape>[] {
   }
 
   // Also show implementation turnover point if > 0 and visible
-  if (turnover > 0 && turnover < MAX_T_VALUE) {
+  if (turnover > 0 && turnover < maxT) {
     shapes.push({
       type: 'line',
       xref: 'x',
@@ -191,6 +199,7 @@ function createRegimeShapes(turnover: number, m: number): Partial<Shape>[] {
  * Create regime boundary annotations.
  *
  * Shows annotations for:
+ * - Text labels inside each regime region (accessibility: not color-only)
  * - Theoretical Small T threshold (T=25)
  * - Asymptotic threshold (30+5m) if visible
  * - Implementation turnover point if > 0
@@ -198,12 +207,65 @@ function createRegimeShapes(turnover: number, m: number): Partial<Shape>[] {
  * @param turnover - The m-dependent turnover point (implementation)
  * @param m - The current order m
  */
-function createRegimeAnnotations(turnover: number, m: number): Partial<PlotlyAnnotation>[] {
+function createRegimeAnnotations(turnover: number, m: number, maxT: number): Partial<PlotlyAnnotation>[] {
   const annotations: Partial<PlotlyAnnotation>[] = [];
   const asymptoticThreshold = getAsymptoticThreshold(m);
 
+  // --- Regime text labels (inside each colored region, for accessibility) ---
+
+  // "Series" label in the blue region (centered between 0 and min(25, maxT))
+  const seriesEnd = Math.min(THEORETICAL_SMALL_T_THRESHOLD, maxT);
+  if (seriesEnd > 0) {
+    annotations.push({
+      x: seriesEnd / 2,
+      y: 0.97,
+      xref: 'x',
+      yref: 'paper',
+      text: 'Series',
+      showarrow: false,
+      font: { size: 10, color: 'rgba(59, 130, 246, 0.7)' },
+      xanchor: 'center',
+      yanchor: 'top',
+    });
+  }
+
+  // "Recurrence" label in the green region (centered between 25 and min(30+5m, maxT))
+  if (THEORETICAL_SMALL_T_THRESHOLD < maxT) {
+    const moderateEnd = Math.min(asymptoticThreshold, maxT);
+    if (THEORETICAL_SMALL_T_THRESHOLD < moderateEnd) {
+      annotations.push({
+        x: (THEORETICAL_SMALL_T_THRESHOLD + moderateEnd) / 2,
+        y: 0.97,
+        xref: 'x',
+        yref: 'paper',
+        text: 'Recurrence',
+        showarrow: false,
+        font: { size: 10, color: 'rgba(34, 197, 94, 0.7)' },
+        xanchor: 'center',
+        yanchor: 'top',
+      });
+    }
+  }
+
+  // "Asymptotic" label in the violet region (centered between 30+5m and maxT)
+  if (asymptoticThreshold < maxT) {
+    annotations.push({
+      x: (asymptoticThreshold + maxT) / 2,
+      y: 0.97,
+      xref: 'x',
+      yref: 'paper',
+      text: 'Asymptotic',
+      showarrow: false,
+      font: { size: 10, color: 'rgba(139, 92, 246, 0.7)' },
+      xanchor: 'center',
+      yanchor: 'top',
+    });
+  }
+
+  // --- Boundary threshold annotations ---
+
   // Annotation at T=25 (theoretical series/moderate boundary)
-  if (THEORETICAL_SMALL_T_THRESHOLD < MAX_T_VALUE) {
+  if (THEORETICAL_SMALL_T_THRESHOLD < maxT) {
     annotations.push({
       x: THEORETICAL_SMALL_T_THRESHOLD,
       y: 1.02,
@@ -217,7 +279,7 @@ function createRegimeAnnotations(turnover: number, m: number): Partial<PlotlyAnn
   }
 
   // Annotation at asymptotic threshold (30+5m) if visible
-  if (asymptoticThreshold < MAX_T_VALUE) {
+  if (asymptoticThreshold < maxT) {
     annotations.push({
       x: asymptoticThreshold,
       y: 1.02,
@@ -231,7 +293,7 @@ function createRegimeAnnotations(turnover: number, m: number): Partial<PlotlyAnn
   }
 
   // Annotation for implementation turnover point if > 0 and visible
-  if (turnover > 0 && turnover < MAX_T_VALUE) {
+  if (turnover > 0 && turnover < maxT) {
     annotations.push({
       x: turnover,
       y: 0.95,
@@ -279,8 +341,8 @@ function createTMarkerAnnotation(currentT: number, currentValue: number | undefi
     xref: 'x',
     yref: 'paper',
     text: currentValue !== undefined
-      ? `T=${currentT.toFixed(1)}<br>F=${currentValue.toExponential(4)}`
-      : `T=${currentT.toFixed(1)}`,
+      ? `T=${currentT}<br>F=${currentValue.toExponential(4)}`
+      : `T=${currentT}`,
     showarrow: false,
     font: { size: 10, color: '#dc2626' },
     xanchor: 'center',
@@ -310,9 +372,11 @@ export function BoysChart({
   sweepData,
   logScale,
   currentT,
+  m = 0,
   loading = false,
   error = null,
 }: BoysChartProps) {
+  const maxT = getMaxTValue(m);
   // Extract x and y values from sweep data
   const { xValues, yValues, currentValue } = useMemo(() => {
     if (!sweepData || !sweepData.results.length) {
@@ -384,12 +448,12 @@ export function BoysChart({
   // Create Plotly layout
   const layout: Partial<Layout> = useMemo(() => {
     const shapes: Partial<Shape>[] = [
-      ...createRegimeShapes(turnover, currentM),
+      ...createRegimeShapes(turnover, currentM, maxT),
       createTMarkerShape(currentT),
     ];
 
     const annotations: Partial<PlotlyAnnotation>[] = [
-      ...createRegimeAnnotations(turnover, currentM),
+      ...createRegimeAnnotations(turnover, currentM, maxT),
       createTMarkerAnnotation(currentT, currentValue),
     ];
 
@@ -400,7 +464,7 @@ export function BoysChart({
       },
       xaxis: {
         title: { text: 'T' },
-        range: [0, MAX_T_VALUE],
+        range: [0, maxT],
         showgrid: true,
         gridcolor: 'rgba(0, 0, 0, 0.1)',
       },
@@ -418,18 +482,51 @@ export function BoysChart({
       showlegend: false,
       hovermode: 'closest',
     };
-  }, [sweepData, logScale, currentT, currentValue, yRange, turnover, currentM]);
+  }, [sweepData, logScale, currentT, currentValue, yRange, turnover, currentM, maxT]);
+
+  // SVG export handler
+  const handleExportSvg = useCallback(() => {
+    const plotEl = document.getElementById(SWEEP_PLOT_DIV_ID);
+    if (plotEl) {
+      Plotly.downloadImage(plotEl as unknown as Plotly.PlotlyHTMLElement, {
+        format: 'svg',
+        filename: `boys-F${sweepData?.m ?? m}-sweep`,
+        width: 800,
+        height: 500,
+      });
+    }
+  }, [sweepData, m]);
 
   return (
-    <PlotPanel
-      data={data}
-      layout={layout}
-      loading={loading}
-      error={error}
-      ariaLabel={`Boys function chart for order m=${sweepData?.m ?? 0}`}
-      minHeight={400}
-      className="w-full"
-    />
+    <div>
+      <PlotPanel
+        data={data}
+        layout={layout}
+        loading={loading}
+        error={error}
+        ariaLabel={`Boys function chart for order m=${sweepData?.m ?? 0}`}
+        minHeight={400}
+        className="w-full"
+        divId={SWEEP_PLOT_DIV_ID}
+      />
+
+      {/* Export SVG button */}
+      {sweepData && sweepData.results.length > 0 && (
+        <div className="flex justify-end mt-1">
+          <button
+            type="button"
+            onClick={handleExportSvg}
+            className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
+            aria-label="Export sweep plot as SVG"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Export SVG
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

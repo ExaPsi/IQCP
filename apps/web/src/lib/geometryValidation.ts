@@ -10,43 +10,24 @@
 import type { GeometryInput, AtomInput } from '../worker/protocol';
 export type { CoordinateUnits } from '../worker/protocol';
 
-// ============================================================================
-// Element Data
-// ============================================================================
-
-/**
- * Supported elements: H through Ne (matching basis set library).
- */
-export const SUPPORTED_ELEMENTS = ['H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne'] as const;
-export type SupportedElement = (typeof SUPPORTED_ELEMENTS)[number];
-
-/**
- * Element symbol to atomic number mapping.
- */
-export const ELEMENT_TO_Z: Record<SupportedElement, number> = {
-  H: 1,
-  He: 2,
-  Li: 3,
-  Be: 4,
-  B: 5,
-  C: 6,
-  N: 7,
-  O: 8,
-  F: 9,
-  Ne: 10,
-};
+// Import for local use and re-export for backward compatibility
+import {
+  ELEMENT_TO_Z as _ELEMENT_TO_Z,
+  isElementSupported as _isElementSupported,
+} from './elements';
+const isElementSupported = _isElementSupported;
+export {
+  ELEMENT_TO_Z,
+  SUPPORTED_ELEMENTS,
+} from './elements';
+export { isElementSupported } from './elements';
+export type { SupportedElement } from './elements';
 
 /**
  * Element symbol to electron count mapping (neutral atom).
+ * For neutral atoms, electron count equals atomic number.
  */
-export const ELEMENT_ELECTRONS: Record<SupportedElement, number> = ELEMENT_TO_Z;
-
-/**
- * Check if an element symbol is supported.
- */
-export function isElementSupported(symbol: string): symbol is SupportedElement {
-  return SUPPORTED_ELEMENTS.includes(symbol as SupportedElement);
-}
+export const ELEMENT_ELECTRONS: Record<string, number> = _ELEMENT_TO_Z;
 
 // ============================================================================
 // Validation Types
@@ -174,7 +155,7 @@ export function parseXyzLine(
     return {
       error: {
         type: 'invalid_element',
-        message: `Unsupported element '${symbol}'. Only H-Ne are supported.`,
+        message: `Unsupported element '${symbol}'. Only H-Ar are supported.`,
         line: lineNumber,
       },
     };

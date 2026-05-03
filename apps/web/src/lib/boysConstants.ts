@@ -180,9 +180,26 @@ export function getTheoreticalRegime(m: number, T: number): 'small' | 'moderate'
 }
 
 /**
- * Maximum T value displayed in charts.
+ * Default maximum T value displayed in charts.
+ * For higher m values, use getMaxTValue(m) which extends
+ * the range to ensure all 3 theoretical regimes are visible.
  */
 export const MAX_T_VALUE = 50;
+
+/**
+ * Get the dynamic maximum T value for a given order m.
+ *
+ * Ensures all 3 theoretical regimes (Small, Moderate, Large/Asymptotic)
+ * are visible in the chart. The asymptotic threshold is 30 + 5*m,
+ * so we add 20 bohr of padding beyond that.
+ *
+ * @param m - Order of the Boys function
+ * @returns Maximum T value that shows all 3 regimes
+ */
+export function getMaxTValue(m: number): number {
+  const asymptoticThreshold = getAsymptoticThreshold(m);
+  return Math.max(MAX_T_VALUE, asymptoticThreshold + 20);
+}
 
 /**
  * Maximum m value supported in the UI.

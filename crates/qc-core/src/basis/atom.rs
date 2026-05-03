@@ -5,9 +5,8 @@
 //!
 //! # Supported Elements
 //!
-//! For the IQCP paper scope (educational quantum chemistry), we support
-//! elements H through Ne (Z = 1-10). This covers the first two periods
-//! and includes all common small molecule examples:
+//! IQCP supports elements H through Ar (Z = 1-18), covering the first three
+//! periods of the periodic table and all common small molecule examples:
 //!
 //! | Z | Symbol | Name |
 //! |---|--------|------|
@@ -21,6 +20,14 @@
 //! | 8 | O | Oxygen |
 //! | 9 | F | Fluorine |
 //! | 10 | Ne | Neon |
+//! | 11 | Na | Sodium |
+//! | 12 | Mg | Magnesium |
+//! | 13 | Al | Aluminium |
+//! | 14 | Si | Silicon |
+//! | 15 | P | Phosphorus |
+//! | 16 | S | Sulfur |
+//! | 17 | Cl | Chlorine |
+//! | 18 | Ar | Argon |
 //!
 //! # Coordinate System
 //!
@@ -39,25 +46,24 @@ use thiserror::Error;
 // Constants
 // =============================================================================
 
-/// Conversion factor from Bohr to Angstrom (CODATA 2014, matches PySCF)
-/// Reference: PySCF lib/param.py BOHR = 0.52917721092
-pub const BOHR_TO_ANGSTROM: f64 = 0.52917721092;
-
-/// Conversion factor from Angstrom to Bohr
-/// This is 1 / BOHR_TO_ANGSTROM
-pub const ANGSTROM_TO_BOHR: f64 = 1.8897261245650618;
+// Re-export from the canonical source in constants module
+pub use crate::constants::ANGSTROM_TO_BOHR;
+pub use crate::constants::BOHR_TO_ANGSTROM;
 
 /// Minimum supported atomic number (Hydrogen)
 pub const MIN_ATOMIC_NUMBER: u8 = 1;
 
-/// Maximum supported atomic number (Neon)
-pub const MAX_ATOMIC_NUMBER: u8 = 10;
+/// Maximum supported atomic number (Argon)
+pub const MAX_ATOMIC_NUMBER: u8 = 18;
 
-/// Element symbols for Z = 1 to 10
-const ELEMENT_SYMBOLS: [&str; 10] = ["H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne"];
+/// Element symbols for Z = 1 to 18
+const ELEMENT_SYMBOLS: [&str; 18] = [
+    "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl",
+    "Ar",
+];
 
-/// Element names for Z = 1 to 10
-const ELEMENT_NAMES: [&str; 10] = [
+/// Element names for Z = 1 to 18
+const ELEMENT_NAMES: [&str; 18] = [
     "Hydrogen",
     "Helium",
     "Lithium",
@@ -68,6 +74,14 @@ const ELEMENT_NAMES: [&str; 10] = [
     "Oxygen",
     "Fluorine",
     "Neon",
+    "Sodium",
+    "Magnesium",
+    "Aluminium",
+    "Silicon",
+    "Phosphorus",
+    "Sulfur",
+    "Chlorine",
+    "Argon",
 ];
 
 // =============================================================================
@@ -81,8 +95,8 @@ pub enum ElementError {
     #[error("Unknown element symbol: '{0}'")]
     UnknownSymbol(String),
 
-    /// Unsupported atomic number (outside Z=1-10 range)
-    #[error("Unsupported atomic number: {0} (must be 1-10 for IQCP)")]
+    /// Unsupported atomic number (outside Z=1-18 range)
+    #[error("Unsupported atomic number: {0} (must be 1-18 for IQCP)")]
     UnsupportedElement(u8),
 }
 
@@ -100,7 +114,7 @@ pub enum ElementError {
 ///
 /// # Returns
 ///
-/// - `Ok(u8)` - Atomic number (1-10)
+/// - `Ok(u8)` - Atomic number (1-18)
 /// - `Err(ElementError::UnknownSymbol)` - Symbol not recognized
 ///
 /// # Example
@@ -129,6 +143,14 @@ pub fn symbol_to_atomic_number(symbol: &str) -> Result<u8, ElementError> {
         "O" => Ok(8),
         "F" => Ok(9),
         "NE" => Ok(10),
+        "NA" => Ok(11),
+        "MG" => Ok(12),
+        "AL" => Ok(13),
+        "SI" => Ok(14),
+        "P" => Ok(15),
+        "S" => Ok(16),
+        "CL" => Ok(17),
+        "AR" => Ok(18),
         _ => Err(ElementError::UnknownSymbol(symbol.to_string())),
     }
 }
@@ -137,7 +159,7 @@ pub fn symbol_to_atomic_number(symbol: &str) -> Result<u8, ElementError> {
 ///
 /// # Arguments
 ///
-/// * `z` - Atomic number (1-10)
+/// * `z` - Atomic number (1-18)
 ///
 /// # Returns
 ///
@@ -152,9 +174,10 @@ pub fn symbol_to_atomic_number(symbol: &str) -> Result<u8, ElementError> {
 /// assert_eq!(atomic_number_to_symbol(1).unwrap(), "H");
 /// assert_eq!(atomic_number_to_symbol(6).unwrap(), "C");
 /// assert_eq!(atomic_number_to_symbol(10).unwrap(), "Ne");
+/// assert_eq!(atomic_number_to_symbol(17).unwrap(), "Cl");
 ///
 /// assert!(atomic_number_to_symbol(0).is_err());
-/// assert!(atomic_number_to_symbol(11).is_err());
+/// assert!(atomic_number_to_symbol(19).is_err());
 /// ```
 pub fn atomic_number_to_symbol(z: u8) -> Result<&'static str, ElementError> {
     if !(MIN_ATOMIC_NUMBER..=MAX_ATOMIC_NUMBER).contains(&z) {
@@ -167,7 +190,7 @@ pub fn atomic_number_to_symbol(z: u8) -> Result<&'static str, ElementError> {
 ///
 /// # Arguments
 ///
-/// * `z` - Atomic number (1-10)
+/// * `z` - Atomic number (1-18)
 ///
 /// # Returns
 ///
@@ -199,8 +222,9 @@ pub fn atomic_number_to_name(z: u8) -> Result<&'static str, ElementError> {
 ///
 /// assert!(is_supported_element(1));   // H
 /// assert!(is_supported_element(10));  // Ne
+/// assert!(is_supported_element(18));  // Ar
 /// assert!(!is_supported_element(0));  // Invalid
-/// assert!(!is_supported_element(11)); // Na (not supported)
+/// assert!(!is_supported_element(19)); // K (not supported)
 /// ```
 #[inline]
 pub fn is_supported_element(z: u8) -> bool {
@@ -232,7 +256,7 @@ pub fn is_supported_element(z: u8) -> bool {
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Atom {
-    /// Atomic number (Z = 1-10)
+    /// Atomic number (Z = 1-18)
     pub atomic_number: u8,
 
     /// Element symbol (e.g., "H", "C", "O")
@@ -247,7 +271,7 @@ impl Atom {
     ///
     /// # Arguments
     ///
-    /// * `atomic_number` - Atomic number (1-10)
+    /// * `atomic_number` - Atomic number (1-18)
     /// * `position` - Cartesian coordinates in Bohr [x, y, z]
     ///
     /// # Returns
@@ -311,7 +335,7 @@ impl Atom {
     ///
     /// # Arguments
     ///
-    /// * `atomic_number` - Atomic number (1-10)
+    /// * `atomic_number` - Atomic number (1-18)
     /// * `position_angstrom` - Cartesian coordinates in Angstrom [x, y, z]
     ///
     /// # Example
@@ -461,7 +485,7 @@ mod tests {
         let result = symbol_to_atomic_number("X");
         assert!(matches!(result, Err(ElementError::UnknownSymbol(_))));
 
-        let result = symbol_to_atomic_number("Na"); // Sodium not supported
+        let result = symbol_to_atomic_number("K"); // Potassium not supported
         assert!(matches!(result, Err(ElementError::UnknownSymbol(_))));
 
         let result = symbol_to_atomic_number("");
@@ -489,8 +513,8 @@ mod tests {
             Err(ElementError::UnsupportedElement(0))
         ));
         assert!(matches!(
-            atomic_number_to_symbol(11),
-            Err(ElementError::UnsupportedElement(11))
+            atomic_number_to_symbol(19),
+            Err(ElementError::UnsupportedElement(19))
         ));
         assert!(matches!(
             atomic_number_to_symbol(100),
@@ -512,7 +536,9 @@ mod tests {
         assert!(is_supported_element(1));
         assert!(is_supported_element(5));
         assert!(is_supported_element(10));
-        assert!(!is_supported_element(11));
+        assert!(is_supported_element(11));
+        assert!(is_supported_element(18));
+        assert!(!is_supported_element(19));
         assert!(!is_supported_element(100));
     }
 
@@ -550,8 +576,8 @@ mod tests {
     #[test]
     fn test_atom_invalid() {
         assert!(Atom::new(0, [0.0, 0.0, 0.0]).is_err());
-        assert!(Atom::new(11, [0.0, 0.0, 0.0]).is_err());
-        assert!(Atom::from_symbol("Na", [0.0, 0.0, 0.0]).is_err());
+        assert!(Atom::new(19, [0.0, 0.0, 0.0]).is_err());
+        assert!(Atom::from_symbol("K", [0.0, 0.0, 0.0]).is_err());
         assert!(Atom::from_symbol("", [0.0, 0.0, 0.0]).is_err());
     }
 
@@ -622,6 +648,73 @@ mod tests {
         let deserialized: Atom = serde_json::from_str(&serialized).unwrap();
 
         assert_eq!(atom, deserialized);
+    }
+
+    // -------------------------------------------------------------------------
+    // Third-row element tests (Na-Ar, Z=11-18)
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_symbol_to_atomic_number_na_ar() {
+        assert_eq!(symbol_to_atomic_number("Na").unwrap(), 11);
+        assert_eq!(symbol_to_atomic_number("Mg").unwrap(), 12);
+        assert_eq!(symbol_to_atomic_number("Al").unwrap(), 13);
+        assert_eq!(symbol_to_atomic_number("Si").unwrap(), 14);
+        assert_eq!(symbol_to_atomic_number("P").unwrap(), 15);
+        assert_eq!(symbol_to_atomic_number("S").unwrap(), 16);
+        assert_eq!(symbol_to_atomic_number("Cl").unwrap(), 17);
+        assert_eq!(symbol_to_atomic_number("Ar").unwrap(), 18);
+    }
+
+    #[test]
+    fn test_symbol_to_atomic_number_case_insensitive_na_ar() {
+        assert_eq!(symbol_to_atomic_number("na").unwrap(), 11);
+        assert_eq!(symbol_to_atomic_number("CL").unwrap(), 17);
+        assert_eq!(symbol_to_atomic_number("ar").unwrap(), 18);
+        assert_eq!(symbol_to_atomic_number("si").unwrap(), 14);
+    }
+
+    #[test]
+    fn test_atomic_number_to_symbol_na_ar() {
+        assert_eq!(atomic_number_to_symbol(11).unwrap(), "Na");
+        assert_eq!(atomic_number_to_symbol(12).unwrap(), "Mg");
+        assert_eq!(atomic_number_to_symbol(13).unwrap(), "Al");
+        assert_eq!(atomic_number_to_symbol(14).unwrap(), "Si");
+        assert_eq!(atomic_number_to_symbol(15).unwrap(), "P");
+        assert_eq!(atomic_number_to_symbol(16).unwrap(), "S");
+        assert_eq!(atomic_number_to_symbol(17).unwrap(), "Cl");
+        assert_eq!(atomic_number_to_symbol(18).unwrap(), "Ar");
+    }
+
+    #[test]
+    fn test_atomic_number_to_name_na_ar() {
+        assert_eq!(atomic_number_to_name(11).unwrap(), "Sodium");
+        assert_eq!(atomic_number_to_name(12).unwrap(), "Magnesium");
+        assert_eq!(atomic_number_to_name(17).unwrap(), "Chlorine");
+        assert_eq!(atomic_number_to_name(18).unwrap(), "Argon");
+    }
+
+    #[test]
+    fn test_is_supported_element_boundary() {
+        assert!(!is_supported_element(0));
+        assert!(is_supported_element(1));
+        assert!(is_supported_element(18));
+        assert!(!is_supported_element(19));
+    }
+
+    #[test]
+    fn test_atom_creation_cl() {
+        let atom = Atom::new(17, [0.0, 0.0, 0.0]).unwrap();
+        assert_eq!(atom.symbol(), "Cl");
+        assert_eq!(atom.atomic_number, 17);
+        assert_eq!(atom.name(), "Chlorine");
+    }
+
+    #[test]
+    fn test_atom_from_symbol_na() {
+        let atom = Atom::from_symbol("Na", [0.0, 0.0, 0.0]).unwrap();
+        assert_eq!(atom.atomic_number, 11);
+        assert_eq!(atom.symbol(), "Na");
     }
 
     // -------------------------------------------------------------------------

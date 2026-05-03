@@ -1,0 +1,18 @@
+# IQCP — PySCF validation and benchmarking environment
+#
+# Pinned versions match the development environment used to generate
+# golden reference data and the benchmarks reported in the JCIM submission.
+# Tested with Python 3.12.
+#
+# Install:
+#   python -m venv .venv
+#   source .venv/bin/activate
+#   pip install -r requirements.txt
+#
+# Verify:
+#   python -c "import pyscf; print(f'PySCF {pyscf.__version__}')"
+
+pyscf==2.11.0
+numpy==2.4.1
+scipy==1.17.0
+h5py==3.15.1

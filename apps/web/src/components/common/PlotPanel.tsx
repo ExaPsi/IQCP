@@ -15,7 +15,7 @@ import { useRef, useEffect, useState, useMemo } from 'react';
 // (basic-dist only has scatter, bar, pie)
 import Plotly from 'plotly.js-cartesian-dist';
 import createPlotlyComponent from 'react-plotly.js/factory';
-import type { Data, Layout, Config } from 'plotly.js';
+import type { Data, Layout, Config, PlotHoverEvent, PlotMouseEvent } from 'plotly.js';
 
 // Create the Plot component using the cartesian Plotly distribution
 const Plot = createPlotlyComponent(Plotly);
@@ -40,6 +40,14 @@ export interface PlotPanelProps {
   ariaLabel?: string;
   /** Minimum height in pixels (default: 300) */
   minHeight?: number;
+  /** Called when a data point is hovered */
+  onHover?: (event: PlotHoverEvent) => void;
+  /** Called when a data point is unhovered */
+  onUnhover?: (event: PlotMouseEvent) => void;
+  /** Called when user clicks on plot data */
+  onClick?: (event: PlotMouseEvent) => void;
+  /** Optional HTML id for the plot div (used by Plotly.downloadImage) */
+  divId?: string;
 }
 
 /**
@@ -142,6 +150,10 @@ export function PlotPanel({
   className = '',
   ariaLabel = 'Interactive plot',
   minHeight = 300,
+  onHover,
+  onUnhover,
+  onClick,
+  divId,
 }: PlotPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -214,6 +226,10 @@ export function PlotPanel({
           config={mergedConfig}
           useResizeHandler={false} // We handle resizing ourselves
           style={{ width: '100%', height: '100%' }}
+          onHover={onHover}
+          onUnhover={onUnhover}
+          onClick={onClick}
+          divId={divId}
         />
       )}
 

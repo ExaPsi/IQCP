@@ -1,0 +1,214 @@
+{
+  "_provenance": {
+    "generator": "scripts/phase5/generate_thermochem_golden.py",
+    "pyscf_version": "2.11.0",
+    "numpy_version": "1.26.4",
+    "basis": "sto-3g",
+    "method": "RHF",
+    "conv_tol": 1e-12,
+    "cart": true,
+    "unit_input": "angstrom",
+    "temperature_k": 298.15,
+    "pressure_pa": 101325.0,
+    "note_infinity": "rot_const entries of +/-1e300 represent +/-Infinity (linear molecules / single atoms)"
+  },
+  "name": "co2",
+  "atoms": [
+    {
+      "Z": 6,
+      "symbol": "C",
+      "pos_bohr": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "Z": 8,
+      "symbol": "O",
+      "pos_bohr": [
+        0.0,
+        0.0,
+        2.1920823044954716
+      ]
+    },
+    {
+      "Z": 8,
+      "symbol": "O",
+      "pos_bohr": [
+        0.0,
+        0.0,
+        -2.1920823044954716
+      ]
+    }
+  ],
+  "scf_energy_ha": -185.06469568222175,
+  "rot_type": "LINEAR",
+  "rotational_constants_ghz": [
+    1e+300,
+    11.737575172773878,
+    11.737575172773878
+  ],
+  "freq_wavenumber_cm1": [
+    421.351994370838,
+    421.3519943709707,
+    1571.3172500195415,
+    2829.041899181251
+  ],
+  "freq_au": [
+    0.08196732780744445,
+    0.08196732780747026,
+    0.3056747751109209,
+    0.5503450982294295
+  ],
+  "symmetry_number": 2,
+  "multiplicity": 1,
+  "temperature_k": 298.15,
+  "pressure_pa": 101325.0,
+  "thermo": {
+    "temperature": {
+      "value": 298.15,
+      "unit": "K"
+    },
+    "pressure": {
+      "value": 101325.0,
+      "unit": "Pa"
+    },
+    "E0": {
+      "value": -185.06469568222175,
+      "unit": "Eh"
+    },
+    "S_elec": {
+      "value": 0.0,
+      "unit": "Eh/K"
+    },
+    "Cv_elec": {
+      "value": 0.0,
+      "unit": "Eh/K"
+    },
+    "Cp_elec": {
+      "value": 0.0,
+      "unit": "Eh/K"
+    },
+    "E_elec": {
+      "value": -185.06469568222175,
+      "unit": "Eh"
+    },
+    "H_elec": {
+      "value": -185.06469568222175,
+      "unit": "Eh"
+    },
+    "S_trans": {
+      "value": 5.939578496916732e-05,
+      "unit": "Eh/K"
+    },
+    "Cv_trans": {
+      "value": 4.750215777928532e-06,
+      "unit": "Eh/K"
+    },
+    "Cp_trans": {
+      "value": 7.917026296547553e-06,
+      "unit": "Eh/K"
+    },
+    "E_trans": {
+      "value": 0.0014162768341893916,
+      "unit": "Eh"
+    },
+    "H_trans": {
+      "value": 0.0023604613903156525,
+      "unit": "Eh"
+    },
+    "sym_number": {
+      "value": 2.0,
+      "unit": ""
+    },
+    "S_rot": {
+      "value": 2.083243841768413e-05,
+      "unit": "Eh/K"
+    },
+    "Cv_rot": {
+      "value": 3.166810518619021e-06,
+      "unit": "Eh/K"
+    },
+    "Cp_rot": {
+      "value": 3.166810518619021e-06,
+      "unit": "Eh/K"
+    },
+    "E_rot": {
+      "value": 0.0009441845561262611,
+      "unit": "Eh"
+    },
+    "H_rot": {
+      "value": 0.0009441845561262611,
+      "unit": "Eh"
+    },
+    "ZPE": {
+      "value": 0.011944576717801537,
+      "unit": "Eh"
+    },
+    "S_vib": {
+      "value": 2.8421839466609416e-06,
+      "unit": "Eh/K"
+    },
+    "Cv_vib": {
+      "value": 4.6315188000794e-06,
+      "unit": "Eh/K"
+    },
+    "Cp_vib": {
+      "value": 4.6315188000794e-06,
+      "unit": "Eh/K"
+    },
+    "E_vib": {
+      "value": 0.01252655618468482,
+      "unit": "Eh"
+    },
+    "H_vib": {
+      "value": 0.01252655618468482,
+      "unit": "Eh"
+    },
+    "G_elec": {
+      "value": -185.06469568222175,
+      "unit": "Eh"
+    },
+    "G_trans": {
+      "value": -0.015348391898241581,
+      "unit": "Eh"
+    },
+    "G_rot": {
+      "value": -0.005267006958106262,
+      "unit": "Eh"
+    },
+    "G_vib": {
+      "value": 0.01167915904098786,
+      "unit": "Eh"
+    },
+    "S_tot": {
+      "value": 8.30704073335124e-05,
+      "unit": "Eh/K"
+    },
+    "Cv_tot": {
+      "value": 1.2548545096626954e-05,
+      "unit": "Eh/K"
+    },
+    "Cp_tot": {
+      "value": 1.5715355615245975e-05,
+      "unit": "Eh/K"
+    },
+    "E_0K": {
+      "value": -185.05275110550394,
+      "unit": "Eh"
+    },
+    "E_tot": {
+      "value": -185.04980866464675,
+      "unit": "Eh"
+    },
+    "H_tot": {
+      "value": -185.04886448009063,
+      "unit": "Eh"
+    },
+    "G_tot": {
+      "value": -185.0736319220371,
+      "unit": "Eh"
+    }
+  }
+}

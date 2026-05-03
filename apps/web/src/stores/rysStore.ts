@@ -1,7 +1,7 @@
 /**
  * Rys Module State Store
  *
- * Zustand store managing the state for Module B (Rys Quadrature Lab).
+ * Zustand store managing the state for Module D (Rys Quadrature Lab).
  * Handles parameter inputs, computation status, error curve status,
  * and URL synchronization.
  *
@@ -52,7 +52,7 @@ export type ErrorCurveStatus =
 export interface RysState {
   /** Number of quadrature points (order), must be 1-10 */
   n: number;
-  /** Parameter T (must be >= 0), typically 0-50 */
+  /** Parameter T (must be >= 0), typically 0-100 */
   T: number;
   /** Target accuracy for order recommendation */
   target: TargetAccuracy;
@@ -72,7 +72,7 @@ export interface RysState {
 export interface RysActions {
   /** Set the order n (clamped to 1-10) */
   setN: (n: number) => void;
-  /** Set the parameter T (clamped to 0-50) */
+  /** Set the parameter T (clamped to 0-100) */
   setT: (T: number) => void;
   /** Set the target accuracy */
   setTarget: (target: TargetAccuracy) => void;
@@ -113,7 +113,7 @@ const DEFAULT_STATE: RysState = {
  * Rys quadrature state store.
  *
  * Manages parameter inputs (n, T, target), computation status,
- * error curve status, and URL synchronization for Module B.
+ * error curve status, and URL synchronization for Module D.
  *
  * @example
  * ```typescript
@@ -148,8 +148,8 @@ export const useRysStore = create<RysState & RysActions>()(
       },
 
       setT: (T: number) => {
-        // Clamp T to valid range [0, 50]
-        const clampedT = Math.max(0, Math.min(50, T));
+        // Clamp T to valid range [0, 100]
+        const clampedT = Math.max(0, Math.min(100, T));
         set({ T: clampedT }, false, 'setT');
       },
 
@@ -165,7 +165,7 @@ export const useRysStore = create<RysState & RysActions>()(
         set(
           {
             n: Math.max(1, Math.min(10, Math.round(params.n))),
-            T: Math.max(0, Math.min(50, params.T)),
+            T: Math.max(0, Math.min(100, params.T)),
             target: params.target,
             urlInitialized: true,
           },

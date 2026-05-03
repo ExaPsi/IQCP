@@ -17,7 +17,7 @@
 //!
 //! # Supported Basis Sets
 //!
-//! The following basis sets are available for elements H-Ne (Z=1-10):
+//! The following basis sets are available for elements H-Ar (Z=1-18):
 //!
 //! | Basis | Type | Description |
 //! |-------|------|-------------|
@@ -25,6 +25,8 @@
 //! | 3-21G | Split-valence | Inner (2) + outer (1) valence |
 //! | 6-31G | Split-valence | Inner (3) + outer (1) valence |
 //! | 6-31G* | Polarized | 6-31G + d functions on heavy atoms |
+//! | 6-31+G* | Polarized + diffuse | 6-31G* + diffuse sp on heavy atoms |
+//! | cc-pVDZ | Correlation-consistent | Dunning double-zeta with polarization |
 //!
 //! # Example
 //!
@@ -51,6 +53,7 @@
 mod atom;
 mod builtin;
 mod primitives;
+pub mod radial;
 mod shells;
 
 // Re-export public types
@@ -62,6 +65,9 @@ pub use builtin::{
     get_element_basis, is_supported_basis, supported_basis_sets, BasisError, ShellData,
 };
 pub use primitives::{AngularMomentum, GaussianPrimitive};
+pub use radial::{
+    auto_r_max, evaluate_radial_profile, primitive_normalization, RadialProfileResult,
+};
 pub use shells::ContractedShell;
 
 use serde::{Deserialize, Serialize};

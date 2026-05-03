@@ -103,7 +103,7 @@ impl RysCoefficients {
 
         // CRITICAL: Transform root from IQCP convention to libcint convention
         //
-        // IQCP rys_roots returns: u = t^2 where t is the actual quadrature point in (0, 1)
+        // IQCP rys_roots returns: u = t^2 where t is the actual quadrature point in [0, 1)
         // libcint formula expects: u_libcint = t^2 / (1 - t^2)
         //
         // Transformation: u_libcint = u / (1 - u)

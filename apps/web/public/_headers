@@ -1,0 +1,28 @@
+# =============================================================================
+# Production Headers for IQCP
+# Works with Cloudflare Pages and Netlify.
+# =============================================================================
+
+# Cross-origin isolation headers (all pages)
+# Required for SharedArrayBuffer used by WASM Web Worker.
+# All resources are npm-bundled (self-hosted), so require-corp is safe.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+# Static assets: aggressive caching with content-hash busting
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# WASM modules: aggressive caching
+/*.wasm
+  Cache-Control: public, max-age=31536000, immutable
+  Content-Type: application/wasm
+
+# HTML files: short cache with revalidation
+/*.html
+  Cache-Control: public, max-age=3600, must-revalidate
+
+# Root index: short cache with revalidation
+/
+  Cache-Control: public, max-age=3600, must-revalidate

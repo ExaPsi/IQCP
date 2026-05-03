@@ -1,0 +1,54 @@
+{
+  "molecule": "C2H6",
+  "basis": "sto-3g",
+  "method": "RHF",
+  "scan_type": "dihedral_rigid",
+  "scan_coordinate": {
+    "type": "dihedral",
+    "atom_indices": [2, 0, 1, 5],
+    "description": "H(2)-C(0)-C(1)-H(5) dihedral torsion. Bottom fragment (H5,H6,H7,C1) rotated around C-C axis."
+  },
+  "reference_geometry_bohr": {
+    "C0": [0.0, 0.0, 1.4508],
+    "C1": [0.0, 0.0, -1.4508],
+    "H2": [0.0, 1.9217, 2.2700],
+    "H3": [1.6641, -0.9609, 2.2700],
+    "H4": [-1.6641, -0.9609, 2.2700],
+    "H5": [0.0, -1.9217, -2.2700],
+    "H6": [-1.6641, 0.9609, -2.2700],
+    "H7": [1.6641, 0.9609, -2.2700],
+    "initial_dihedral_deg": 180.0,
+    "conformation": "staggered"
+  },
+  "scan_range": {
+    "min_deg": 0,
+    "max_deg": 360,
+    "n_points": 13,
+    "step_deg": 30
+  },
+  "pyscf_version": "2.11.0",
+  "conv_tol": 1e-10,
+  "generated": "2026-04-06",
+  "note": "Eclipsed at 0/120/240 deg; staggered at 60/180/300 deg. 3-fold barrier.",
+  "points": [
+    {"dihedral_deg": 0, "energy": -78.29837329585482},
+    {"dihedral_deg": 30, "energy": -78.30040591244963},
+    {"dihedral_deg": 60, "energy": -78.30241435450785},
+    {"dihedral_deg": 90, "energy": -78.30040591247644},
+    {"dihedral_deg": 120, "energy": -78.29837329589740},
+    {"dihedral_deg": 150, "energy": -78.30040591247763},
+    {"dihedral_deg": 180, "energy": -78.30241435451951},
+    {"dihedral_deg": 210, "energy": -78.30040591247763},
+    {"dihedral_deg": 240, "energy": -78.29837329589728},
+    {"dihedral_deg": 270, "energy": -78.30040591247640},
+    {"dihedral_deg": 300, "energy": -78.30241435450785},
+    {"dihedral_deg": 330, "energy": -78.30040591244975},
+    {"dihedral_deg": 360, "energy": -78.29837329585479}
+  ],
+  "barrier_height": {
+    "hartree": 0.004041058628558858,
+    "mhartree": 4.041058628558858,
+    "kcal_mol": 2.53580257441013,
+    "description": "E(eclipsed, 0 deg) - E(staggered, 60 deg)"
+  }
+}

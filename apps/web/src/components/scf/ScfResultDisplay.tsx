@@ -13,6 +13,7 @@ import { ScfIterationTable } from './ScfIterationTable';
 import { ScfEnergyPlot } from './ScfEnergyPlot';
 import { ScfResidualPlot } from './ScfResidualPlot';
 import { ScfInternalsPanel } from './ScfInternalsPanel';
+import { PopulationTable } from './PopulationTable';
 import { Math } from '../common/Math';
 import { useScfStore, type DisplayMode } from '../../stores/scfStore';
 
@@ -133,6 +134,7 @@ function ModeToggle({
  */
 function ExplanationView({ className = '' }: { className?: string }) {
   const compute = useScfStore((state) => state.compute);
+  const populationResult = useScfStore((state) => state.populationResult);
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -184,6 +186,11 @@ function ExplanationView({ className = '' }: { className?: string }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Population Analysis (US-076) */}
+      {compute.status === 'success' && populationResult && (
+        <PopulationTable result={populationResult} />
       )}
     </div>
   );

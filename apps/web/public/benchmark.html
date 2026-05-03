@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>IQCP WASM Benchmark Suite</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, monospace; background: #1a1a2e; color: #e0e0e0; padding: 2em; max-width: 1100px; margin: 0 auto; }
+    h1 { color: #53a8b6; }
+    h2 { color: #53a8b6; margin-top: 1.5em; border-bottom: 1px solid #333; padding-bottom: 4px; }
+    h3 { color: #79b5c0; margin-top: 1em; }
+    table { border-collapse: collapse; margin: 0.5em 0 1em; width: 100%; font-size: 13px; }
+    th, td { border: 1px solid #333; padding: 5px 10px; text-align: right; }
+    th { background: #16213e; text-align: left; }
+    td:first-child { text-align: left; }
+    button { background: #53a8b6; color: white; border: none; padding: 10px 20px; cursor: pointer; font-size: 14px; border-radius: 4px; margin-right: 8px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: #4a5568; }
+    #status { margin: 1em 0; padding: 8px; background: #16213e; border-radius: 4px; }
+    #progress { height: 4px; background: #333; border-radius: 2px; margin: 4px 0; }
+    #progressBar { height: 100%; background: #53a8b6; border-radius: 2px; width: 0%; transition: width 0.3s; }
+    pre { background: #0f0f1a; padding: 1em; border-radius: 4px; overflow-x: auto; font-size: 12px; max-height: 400px; }
+    .info { color: #fbbf24; font-size: 13px; }
+    .machine { background: #16213e; padding: 12px; border-radius: 6px; margin: 1em 0; }
+    .machine td { border: none; padding: 3px 8px; }
+    .warn { color: #f59e0b; }
+    code { background: #0f0f1a; padding: 1px 4px; border-radius: 2px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>IQCP WASM Benchmark Suite</h1>
+  <p>Comprehensive benchmark for the JCIM manuscript. Measures load time, SCF performance
+     (RHF + LDA + B3LYP at 6-31G*), and cross-browser determinism.</p>
+  <p class="info">Run this page in Chrome, Firefox, AND Safari on the same machine.
+     Copy the JSON output from each browser for the manuscript.</p>
+
+  <h2>Machine Information</h2>
+  <table class="machine" id="machineTable">
+    <tbody>
+      <tr><td>Browser</td><td id="mBrowser"></td></tr>
+      <tr><td>Platform</td><td id="mPlatform"></td></tr>
+      <tr><td>User Agent</td><td id="mUA" style="font-size:11px; word-break:break-all;"></td></tr>
+      <tr><td>Logical Cores</td><td id="mCores"></td></tr>
+      <tr><td>Device Memory</td><td id="mMemory"></td></tr>
+      <tr><td>Date</td><td id="mDate"></td></tr>
+    </tbody>
+  </table>
+
+  <div>
+    <button id="runBtn" onclick="runAll()" disabled>Loading WASM...</button>
+    <button class="secondary" onclick="exportJSON()" id="exportBtn" disabled>Export JSON</button>
+    <button class="secondary" onclick="copyJSON()" id="copyBtn" disabled>Copy JSON to Clipboard</button>
+  </div>
+  <div id="status">Initializing WASM...</div>
+  <div id="progress"><div id="progressBar"></div></div>
+
+  <h2>1. Load Time Metrics</h2>
+  <table id="loadTable">
+    <thead><tr><th>Metric</th><th>Value (ms)</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>2. RHF Preset Systems (pre-computed integrals)</h2>
+  <table id="rhfPresetTable">
+    <thead><tr><th>System</th><th>N<sub>bf</sub></th><th>Runs</th><th>Mean (ms)</th><th>Std (ms)</th><th>Min (ms)</th><th>E (Ha)</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>3. On-the-Fly SCF: 6 Molecules × 3 Methods at 6-31G*</h2>
+  <p class="info">This is the primary benchmark for Table 4. Includes integrals + grid + SCF.</p>
+
+  <h3>3a. RHF / 6-31G*</h3>
+  <table id="rhfOTFTable">
+    <thead><tr><th>Molecule</th><th>N<sub>bf</sub></th><th>Runs</th><th>Mean (ms)</th><th>Std (ms)</th><th>Min (ms)</th><th>E (Ha)</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h3>3b. LDA / 6-31G*</h3>
+  <table id="ldaTable">
+    <thead><tr><th>Molecule</th><th>N<sub>bf</sub></th><th>Runs</th><th>Mean (ms)</th><th>Std (ms)</th><th>Min (ms)</th><th>E (Ha)</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h3>3c. B3LYP / 6-31G*</h3>
+  <table id="b3lypTable">
+    <thead><tr><th>Molecule</th><th>N<sub>bf</sub></th><th>Runs</th><th>Mean (ms)</th><th>Std (ms)</th><th>Min (ms)</th><th>E (Ha)</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>4. Cross-Browser Determinism</h2>
+  <p>Compare Float64 hex values across browsers. Identical hex = bit-identical computation.</p>
+  <table id="detTable">
+    <thead><tr><th>System</th><th>Method</th><th>Energy (Ha)</th><th>Float64 Hex</th><th>Iters</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>5. Raw JSON Output</h2>
+  <pre id="jsonOutput">Run benchmarks to generate...</pre>
+
+  <script type="module">
+    import init, * as wasm from '/src/wasm/qc_wasm.js';
+
+    // =========================================================================
+    // Machine info
+    // =========================================================================
+    const ua = navigator.userAgent;
+    let browserName = 'Unknown';
+    let browserVersion = '';
+    if (ua.includes('Firefox/')) { browserName = 'Firefox'; browserVersion = ua.match(/Firefox\/([\d.]+)/)?.[1] || ''; }
+    else if (ua.includes('Edg/')) { browserName = 'Edge'; browserVersion = ua.match(/Edg\/([\d.]+)/)?.[1] || ''; }
+    else if (ua.includes('Chrome/')) { browserName = 'Chrome'; browserVersion = ua.match(/Chrome\/([\d.]+)/)?.[1] || ''; }
+    else if (ua.includes('Safari/')) { browserName = 'Safari'; browserVersion = ua.match(/Version\/([\d.]+)/)?.[1] || ''; }
+
+    document.getElementById('mBrowser').textContent = `${browserName} ${browserVersion}`;
+    document.getElementById('mPlatform').textContent = navigator.platform || 'unknown';
+    document.getElementById('mUA').textContent = ua;
+    document.getElementById('mCores').textContent = navigator.hardwareConcurrency || 'unknown';
+    document.getElementById('mMemory').textContent = navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'not available (Safari)';
+    document.getElementById('mDate').textContent = new Date().toISOString();
+
+    // =========================================================================
+    // Molecule definitions (Bohr coordinates)
+    // =========================================================================
+    const MOLECULES = [
+      { name: 'H2',   nbf: 4, runs: 10, atoms: [[1,0,0,0],[1,0,0,1.4]] },
+      { name: 'HF',   nbf: 17, runs: 7, atoms: [[1,0,0,0],[9,0,0,1.7328]] },
+      { name: 'H2O',  nbf: 19, runs: 7, atoms: [[8,0,0,0.2217282],[1,0,1.4305447,-0.8869128],[1,0,-1.4305447,-0.8869128]] },
+      { name: 'NH3',  nbf: 21, runs: 7, atoms: [[7,0,0,0.219705],[1,0,1.7714918,-0.512645],[1,1.5342036,-0.8857459,-0.512645],[1,-1.5342036,-0.8857459,-0.512645]] },
+      { name: 'CH4',  nbf: 23, runs: 5, atoms: [[6,0,0,0],[1,1.186,1.186,1.186],[1,-1.186,-1.186,1.186],[1,-1.186,1.186,-1.186],[1,1.186,-1.186,-1.186]] },
+      { name: 'C6H6', nbf: 102, runs: 3, atoms: [
+        [6,0,2.6399472,0],[6,2.2861905,1.3199736,0],[6,2.2861905,-1.3199736,0],
+        [6,0,-2.6399472,0],[6,-2.2861905,-1.3199736,0],[6,-2.2861905,1.3199736,0],
+        [1,0,4.6884102,0],[1,4.0602653,2.3442051,0],[1,4.0602653,-2.3442051,0],
+        [1,0,-4.6884102,0],[1,-4.0602653,-2.3442051,0],[1,-4.0602653,2.3442051,0],
+      ]},
+    ];
+
+    const METHODS = ['rhf', 'lda', 'b3lyp'];
+
+    const RHF_PRESETS = [
+      { name: 'H2/STO-3G', file: 'h2_sto3g_r1.4.json', nbf: 2 },
+      { name: 'HeH+/STO-3G', file: 'heh_plus_sto3g.json', nbf: 2 },
+      { name: 'LiH/STO-3G', file: 'lih_sto3g.json', nbf: 6 },
+      { name: 'H2O/STO-3G', file: 'h2o_sto3g.json', nbf: 7 },
+      { name: 'NH3/STO-3G', file: 'nh3_sto3g.json', nbf: 8 },
+    ];
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+    const status = document.getElementById('status');
+    const progressBar = document.getElementById('progressBar');
+    let allResults = {};
+    let presetCache = {};
+
+    function float64ToHex(val) {
+      const buf = new ArrayBuffer(8);
+      new Float64Array(buf)[0] = val;
+      return Array.from(new Uint8Array(buf)).reverse().map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function bench(fn, N) {
+      fn(); // warmup (not timed)
+      const times = [];
+      let lastResult;
+      for (let i = 0; i < N; i++) {
+        const t0 = performance.now();
+        lastResult = fn();
+        times.push(performance.now() - t0);
+      }
+      const mean = times.reduce((a, b) => a + b) / N;
+      const std = Math.sqrt(times.reduce((a, b) => a + (b - mean) ** 2, 0) / (N - 1 || 1));
+      return { mean, std, min: Math.min(...times), max: Math.max(...times), times, N, result: lastResult };
+    }
+
+    function setProgress(pct) { progressBar.style.width = pct + '%'; }
+
+    // =========================================================================
+    // Init
+    // =========================================================================
+    const pageLoadStart = performance.now();
+
+    async function initWasm() {
+      try {
+        const t0 = performance.now();
+        await init();
+        const wasmInitTime = performance.now() - t0;
+
+        const ttfcStart = performance.now();
+        const r = await fetch('/presets/h2_sto3g_r1.4.json');
+        const json = await r.text();
+        presetCache['h2_sto3g_r1.4.json'] = json;
+        wasm.scf_run(json, { convergenceProfile: 'tight', maxIterations: 100, useDiis: true });
+        const ttfc = performance.now() - ttfcStart;
+        const tti = performance.now() - pageLoadStart;
+
+        const loadBody = document.querySelector('#loadTable tbody');
+        loadBody.insertRow().innerHTML = `<td>WASM init (compile + instantiate)</td><td>${wasmInitTime.toFixed(0)}</td>`;
+        loadBody.insertRow().innerHTML = `<td>Time-to-first-calculation</td><td>${ttfc.toFixed(0)}</td>`;
+        loadBody.insertRow().innerHTML = `<td>Total time-to-interactive</td><td>${tti.toFixed(0)}</td>`;
+        loadBody.insertRow().innerHTML = `<td>WASM version</td><td>${wasm.version()}</td>`;
+
+        allResults.loadTime = { wasmInit: +wasmInitTime.toFixed(0), ttfc: +ttfc.toFixed(0), tti: +tti.toFixed(0), wasmVersion: wasm.version() };
+
+        document.getElementById('runBtn').disabled = false;
+        document.getElementById('runBtn').textContent = 'Run Full Benchmark Suite';
+        status.textContent = `Ready. WASM init: ${wasmInitTime.toFixed(0)}ms. Click "Run Full Benchmark Suite".`;
+      } catch (e) {
+        status.textContent = 'WASM init failed: ' + e.message;
+      }
+    }
+
+    // =========================================================================
+    // Main benchmark
+    // =========================================================================
+    window.runAll = async function() {
+      document.getElementById('runBtn').disabled = true;
+      const startTime = performance.now();
+      allResults.machine = {
+        browser: browserName, browserVersion, platform: navigator.platform,
+        userAgent: ua, cores: navigator.hardwareConcurrency,
+        memory: navigator.deviceMemory || null, date: new Date().toISOString(),
+      };
+
+      const totalSteps = RHF_PRESETS.length + MOLECULES.length * METHODS.length;
+      let step = 0;
+
+      // --- RHF Presets ---
+      allResults.rhfPresets = [];
+      const rhfBody = document.querySelector('#rhfPresetTable tbody');
+      rhfBody.innerHTML = '';
+
+      for (const sys of RHF_PRESETS) {
+        status.textContent = `RHF preset: ${sys.name}...`;
+        setProgress((++step / totalSteps) * 100);
+        await new Promise(r => setTimeout(r, 30));
+        try {
+          if (!presetCache[sys.file]) {
+            const r = await fetch('/presets/' + sys.file);
+            presetCache[sys.file] = await r.text();
+          }
+          const json = presetCache[sys.file];
+          const opts = { convergenceProfile: 'tight', maxIterations: 100, useDiis: true, includeMatrices: false };
+          const { mean, std, min, N, result } = bench(() => wasm.scf_run(json, opts), 20);
+          const energy = result?.energy ?? NaN;
+          rhfBody.insertRow().innerHTML = `<td>${sys.name}</td><td>${sys.nbf}</td><td>${N}</td><td>${mean.toFixed(2)}</td><td>${std.toFixed(2)}</td><td>${min.toFixed(2)}</td><td>${energy.toFixed(10)}</td>`;
+          allResults.rhfPresets.push({ system: sys.name, nbf: sys.nbf, runs: N, mean: +mean.toFixed(2), std: +std.toFixed(2), min: +min.toFixed(2), energy, hex: float64ToHex(energy), iterations: result?.iterations });
+        } catch (e) {
+          rhfBody.insertRow().innerHTML = `<td>${sys.name}</td><td colspan="6">Error: ${e.message}</td>`;
+        }
+      }
+
+      // --- On-the-fly: 6 molecules × 3 methods ---
+      const tableIds = { rhf: 'rhfOTFTable', lda: 'ldaTable', b3lyp: 'b3lypTable' };
+      allResults.otf = {};
+
+      for (const method of METHODS) {
+        allResults.otf[method] = [];
+        const tbody = document.querySelector(`#${tableIds[method]} tbody`);
+        tbody.innerHTML = '';
+
+        for (const mol of MOLECULES) {
+          status.textContent = `${method.toUpperCase()} ${mol.name}/6-31G* (${mol.runs} runs)...`;
+          setProgress((++step / totalSteps) * 100);
+          await new Promise(r => setTimeout(r, 30));
+          try {
+            const input = {
+              atoms: mol.atoms, basisName: '6-31g*', method: method,
+              convergenceProfile: 'tight', maxIterations: 200, useDiis: true,
+              gridQuality: 'standard',
+            };
+            const { mean, std, min, N, result } = bench(() => wasm.ks_scf(input, null), mol.runs);
+            const energy = result?.energy ?? NaN;
+            tbody.insertRow().innerHTML = `<td>${mol.name}</td><td>${mol.nbf}</td><td>${N}</td><td>${mean.toFixed(1)}</td><td>${std.toFixed(1)}</td><td>${min.toFixed(1)}</td><td>${energy.toFixed(10)}</td>`;
+            allResults.otf[method].push({
+              molecule: mol.name, nbf: mol.nbf, runs: N,
+              mean: +mean.toFixed(1), std: +std.toFixed(1), min: +min.toFixed(1),
+              energy, hex: float64ToHex(energy),
+              iterations: result?.iterations, converged: result?.converged,
+            });
+          } catch (e) {
+            tbody.insertRow().innerHTML = `<td>${mol.name}</td><td colspan="6">Error: ${e.message}</td>`;
+            allResults.otf[method].push({ molecule: mol.name, error: e.message });
+          }
+        }
+      }
+
+      // --- Determinism table (9 canonical cases) ---
+      const detBody = document.querySelector('#detTable tbody');
+      detBody.innerHTML = '';
+      allResults.determinism = [];
+
+      // Collect from RHF presets
+      for (const r of allResults.rhfPresets) {
+        detBody.insertRow().innerHTML = `<td>${r.system}</td><td>RHF</td><td>${r.energy.toFixed(12)}</td><td><code>${r.hex}</code></td><td>${r.iterations}</td>`;
+        allResults.determinism.push({ system: r.system, method: 'RHF', energy: r.energy, hex: r.hex, iterations: r.iterations });
+      }
+      // Collect from B3LYP OTF (main determinism cases)
+      for (const r of (allResults.otf.b3lyp || [])) {
+        if (r.error) continue;
+        detBody.insertRow().innerHTML = `<td>${r.molecule}/6-31G*</td><td>B3LYP</td><td>${r.energy.toFixed(12)}</td><td><code>${r.hex}</code></td><td>${r.iterations}</td>`;
+        allResults.determinism.push({ system: `${r.molecule}/6-31G*`, method: 'B3LYP', energy: r.energy, hex: r.hex, iterations: r.iterations });
+      }
+
+      // --- Summary ---
+      const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+      allResults.totalBenchmarkTime = +elapsed;
+      status.textContent = `Complete in ${elapsed}s. Export the JSON below.`;
+      setProgress(100);
+
+      // Render JSON
+      const jsonStr = JSON.stringify(allResults, null, 2);
+      document.getElementById('jsonOutput').textContent = jsonStr;
+      document.getElementById('exportBtn').disabled = false;
+      document.getElementById('copyBtn').disabled = false;
+      document.getElementById('runBtn').disabled = false;
+    };
+
+    window.exportJSON = function() {
+      const blob = new Blob([JSON.stringify(allResults, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `iqcp-benchmark-${browserName.toLowerCase()}-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+    };
+
+    window.copyJSON = function() {
+      navigator.clipboard.writeText(JSON.stringify(allResults, null, 2))
+        .then(() => { document.getElementById('copyBtn').textContent = 'Copied!'; setTimeout(() => { document.getElementById('copyBtn').textContent = 'Copy JSON to Clipboard'; }, 2000); });
+    };
+
+    initWasm();
+  </script>
+</body>
+</html>

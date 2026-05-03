@@ -1,0 +1,37 @@
+{
+  "_provenance": {
+    "generator": "scripts/phase5/generate_ir_golden.py",
+    "pyscf_version": "2.11.0",
+    "basis": "sto-3g",
+    "method": "UHF (H atom, open shell)",
+    "description": "Single-atom edge case for US-097"
+  },
+  "name": "atom",
+  "atoms": [
+    {
+      "Z": 1,
+      "symbol": "H",
+      "pos_bohr": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "n_atoms": 1,
+  "n_modes": 0,
+  "energy": -0.46658184955727533,
+  "dipole_au": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "freq_wavenumber": [],
+  "norm_mode": [],
+  "dipole_derivs_cartesian": [
+    [],
+    [],
+    []
+  ],
+  "ir_intensities_km_mol": []
+}

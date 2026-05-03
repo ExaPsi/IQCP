@@ -6,12 +6,14 @@
  * @module worker/handlers/boys
  */
 
-import { boys_eval, boys_eval_many } from '../../wasm/qc_wasm';
+import { boys_eval, boys_eval_many, boys_eval_all } from '../../wasm/qc_wasm';
 import type {
   BoysEvalRequest,
   BoysSweepRequest,
+  BoysEvalAllRequest,
   BoysEvalResult,
   BoysSweepResult,
+  BoysEvalAllResult,
   ErrorResponse,
 } from '../protocol';
 
@@ -111,5 +113,38 @@ export function handleBoysSweep(
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown WASM error';
     return errorResponse(requestId, 'HANDLER_ERROR', `Boys sweep failed: ${message}`);
+  }
+}
+
+/**
+ * Handle boys_eval_all request (multi-order evaluation).
+ *
+ * Computes F_0(T) through F_mMax(T) at a single T value.
+ * This is efficient because the WASM function computes
+ * intermediate orders during the recurrence/series evaluation.
+ */
+export function handleBoysEvalAll(
+  request: BoysEvalAllRequest
+): BoysEvalAllResult | ErrorResponse {
+  const { requestId, mMax, T } = request;
+
+  // Validate parameters
+  if (mMax < 0 || !Number.isInteger(mMax)) {
+    return errorResponse(requestId, 'INVALID_PARAMS', `Invalid mMax=${mMax}: must be a non-negative integer`);
+  }
+  if (T < 0) {
+    return errorResponse(requestId, 'INVALID_PARAMS', `Invalid argument T=${T}: must be >= 0`);
+  }
+
+  try {
+    const results = boys_eval_all(mMax, T) as BoysEvalResult[];
+    return {
+      results,
+      mMax,
+      T,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown WASM error';
+    return errorResponse(requestId, 'HANDLER_ERROR', `Boys eval_all failed: ${message}`);
   }
 }

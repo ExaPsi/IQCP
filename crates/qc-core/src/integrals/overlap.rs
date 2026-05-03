@@ -342,7 +342,9 @@ pub fn shell_overlap(shell_a: &ContractedShell, shell_b: &ContractedShell) -> Ve
 #[inline]
 pub(crate) fn cartesian_gaussian_normalization(alpha: f64, powers: &CartesianPower) -> f64 {
     // Base normalization: (2*alpha/pi)^(3/4)
-    let base = (2.0 * alpha / PI).powf(0.75);
+    // Rewrite as ((2α/π)^3)^(1/4) = sqrt(sqrt((2α/π)^3)) to avoid powf()
+    let two_a_pi = 2.0 * alpha / PI;
+    let base = (two_a_pi * two_a_pi * two_a_pi).sqrt().sqrt();
 
     let i = powers.i;
     let j = powers.j;
@@ -355,8 +357,15 @@ pub(crate) fn cartesian_gaussian_normalization(alpha: f64, powers: &CartesianPow
     }
 
     // Angular part: (4*alpha)^(L/2) / sqrt((2i-1)!! * (2j-1)!! * (2k-1)!!)
+    // Compute (4α)^(L/2) without powf() using explicit cases
     let four_alpha = 4.0 * alpha;
-    let ang_num = four_alpha.powf(l as f64 / 2.0);
+    let ang_num = match l {
+        1 => four_alpha.sqrt(),
+        2 => four_alpha,
+        3 => four_alpha * four_alpha.sqrt(),
+        4 => four_alpha * four_alpha,
+        _ => four_alpha.powf(l as f64 / 2.0), // fallback for L > 4
+    };
 
     // Double factorial denominator for each axis
     let denom_i = double_factorial(if i > 0 { 2 * i - 1 } else { 0 }) as f64;
@@ -723,6 +732,63 @@ pub fn overlap_matrix_spherical(basis: &BasisSet) -> Vec<f64> {
     // Compute Cartesian matrix and transform
     let cart_matrix = overlap_matrix(basis);
     transform_one_electron_matrix(&cart_matrix, &basis.shells)
+}
+
+// =============================================================================
+// Overlap vs. Distance Scan
+// =============================================================================
+
+/// Evaluate the overlap integral between two contracted shells at multiple
+/// interatomic distances.
+///
+/// For each distance R in `r_values`, this function places `shell_a` at the
+/// origin `[0, 0, 0]` and `shell_b` at `[0, 0, R]`, then computes their
+/// overlap integral using `shell_overlap`.
+///
+/// # Arguments
+///
+/// * `shell_a` - First contracted shell (will be placed at origin)
+/// * `shell_b` - Second contracted shell (will be placed at `[0, 0, R]`)
+/// * `r_values` - Interatomic distances (in Bohr) at which to evaluate
+///
+/// # Returns
+///
+/// Vector of overlap integral values `S_ab(R)`, one per distance in `r_values`.
+/// For s-s overlaps, this is the single overlap element. For higher angular
+/// momentum, this returns the overlap of the first Cartesian component of each
+/// shell (e.g., `px-px` for p-p overlap, `s-px` for s-p overlap).
+///
+/// # Postconditions
+///
+/// * Return vector has length `r_values.len()`
+/// * At R=0 with identical shells: `S_ab ~ 1.0` (within normalization precision)
+/// * At R -> inf: `S_ab -> 0`
+///
+/// # References
+///
+/// * Obara & Saika (1986), J. Chem. Phys. 84, 3963
+/// * Existing `shell_overlap` implementation in this module
+pub fn evaluate_overlap_vs_distance(
+    shell_a: &ContractedShell,
+    shell_b: &ContractedShell,
+    r_values: &[f64],
+) -> Vec<f64> {
+    r_values
+        .iter()
+        .map(|&r| {
+            // Place shell_a at origin, shell_b at [0, 0, R]
+            let mut a = shell_a.clone();
+            a.center = [0.0, 0.0, 0.0];
+
+            let mut b = shell_b.clone();
+            b.center = [0.0, 0.0, r];
+
+            // Compute shell overlap block and extract [0, 0] element
+            // (first Cartesian component of each shell)
+            let block = shell_overlap(&a, &b);
+            block[0]
+        })
+        .collect()
 }
 
 // =============================================================================
@@ -1230,5 +1296,203 @@ mod tests {
                 diag
             );
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // evaluate_overlap_vs_distance tests (US-054)
+    // -------------------------------------------------------------------------
+    //
+    // Golden values generated from PySCF 2.11.0:
+    //   mol.atom = f'H 0 0 0; H 0 0 {R}'
+    //   mol.unit = 'bohr'; mol.basis = 'sto-3g'; mol.build(verbose=0)
+    //   S = mol.intor('int1e_ovlp'); S[0,1]
+
+    /// Helper: construct H(1s) STO-3G contracted shell at a given center
+    fn h_1s_sto3g_shell(center: [f64; 3]) -> ContractedShell {
+        ContractedShell::new(AngularMomentum::S, h_sto3g_primitives(), center, 0)
+    }
+
+    /// Helper: construct He(1s) STO-3G contracted shell at a given center
+    fn he_1s_sto3g_shell(center: [f64; 3]) -> ContractedShell {
+        ContractedShell::new(
+            AngularMomentum::S,
+            vec![
+                GaussianPrimitive::new(6.3624213900, 0.1543289704),
+                GaussianPrimitive::new(1.1589230000, 0.5353281416),
+                GaussianPrimitive::new(0.3136497900, 0.4446345413),
+            ],
+            center,
+            0,
+        )
+    }
+
+    // OD-R1 through OD-R8: H(1s)-H(1s) STO-3G overlap at specific distances
+    // Reference: PySCF 2.11.0 mol.intor('int1e_ovlp')[0,1]
+    //
+    // Note: IQCP's Obara-Saika implementation matches PySCF within ~1e-9.
+    // The small discrepancy arises from accumulated floating-point rounding
+    // in the recurrence relations and normalization conventions. This is
+    // consistent with the existing overlap module tolerance (TOL = 1e-9).
+    #[test]
+    fn test_overlap_vs_distance_h_h_sto3g_golden() {
+        let shell_a = h_1s_sto3g_shell([0.0, 0.0, 0.0]);
+        let shell_b = h_1s_sto3g_shell([0.0, 0.0, 0.0]);
+
+        let r_values = vec![0.5, 1.0, 1.3984, 2.0, 3.0, 5.0, 8.0, 10.0];
+        let expected = vec![
+            9.405268653093932e-01, // R=0.5
+            7.965883006970911e-01, // R=1.0
+            6.598721980070731e-01, // R=1.3984
+            4.627776954301663e-01, // R=2.0
+            2.261896476964506e-01, // R=3.0
+            3.747005011027010e-02, // R=5.0
+            9.626096800740930e-04, // R=8.0
+            4.319600325118806e-05, // R=10.0
+        ];
+
+        let result = evaluate_overlap_vs_distance(&shell_a, &shell_b, &r_values);
+
+        assert_eq!(result.len(), expected.len());
+        for (computed, reference) in result.iter().zip(expected.iter()) {
+            // Use relative tolerance for values spanning many orders of magnitude.
+            // For small absolute values (< 1e-10), use proportional absolute tolerance.
+            let r: f64 = *reference;
+            let c: f64 = *computed;
+            let tol = if r.abs() < 1e-10 {
+                1e-14
+            } else {
+                r.abs() * 1e-9
+            };
+            assert!(
+                (c - r).abs() < tol,
+                "Overlap mismatch: computed={:.15e}, reference={:.15e}, diff={:.2e}, tol={:.2e}",
+                c,
+                r,
+                (c - r).abs(),
+                tol,
+            );
+        }
+    }
+
+    // OD-R9: Self-overlap at R=0
+    // The diagonal overlap S(R=0) for identical normalized shells should be
+    // very close to 1.0. We use the same tolerance as the overlap matrix
+    // diagonal tests (TOL = 1e-9).
+    #[test]
+    fn test_overlap_vs_distance_self_overlap_r0() {
+        let shell = h_1s_sto3g_shell([0.0, 0.0, 0.0]);
+        let result = evaluate_overlap_vs_distance(&shell, &shell, &[0.0]);
+
+        assert_eq!(result.len(), 1);
+        assert_abs_diff_eq!(result[0], 1.0, epsilon = TOL);
+    }
+
+    // OD-R10: Symmetry: S(H,He) = S(He,H)
+    #[test]
+    fn test_overlap_vs_distance_h_he_symmetry() {
+        let h_shell = h_1s_sto3g_shell([0.0, 0.0, 0.0]);
+        let he_shell = he_1s_sto3g_shell([0.0, 0.0, 0.0]);
+
+        let r = [2.0];
+        let s_h_he = evaluate_overlap_vs_distance(&h_shell, &he_shell, &r);
+        let s_he_h = evaluate_overlap_vs_distance(&he_shell, &h_shell, &r);
+
+        assert_abs_diff_eq!(s_h_he[0], s_he_h[0], epsilon = 1e-14);
+    }
+
+    // OD-R11: Pairwise symmetry for shell_a, shell_b swap
+    #[test]
+    fn test_overlap_vs_distance_pairwise_symmetry() {
+        let h_shell = h_1s_sto3g_shell([0.0, 0.0, 0.0]);
+        let he_shell = he_1s_sto3g_shell([0.0, 0.0, 0.0]);
+
+        let r_values: Vec<f64> = (1..=10).map(|i| i as f64 * 0.5).collect();
+        let s_ab = evaluate_overlap_vs_distance(&h_shell, &he_shell, &r_values);
+        let s_ba = evaluate_overlap_vs_distance(&he_shell, &h_shell, &r_values);
+
+        for (a, b) in s_ab.iter().zip(s_ba.iter()) {
+            assert_abs_diff_eq!(a, b, epsilon = 1e-14);
+        }
+    }
+
+    // OD-R12 through OD-R14: H(1s)-He(1s) STO-3G at specific distances
+    // Reference: PySCF 2.11.0 (mol.spin=1 for odd electron count)
+    #[test]
+    fn test_overlap_vs_distance_h_he_sto3g_golden() {
+        let h_shell = h_1s_sto3g_shell([0.0, 0.0, 0.0]);
+        let he_shell = he_1s_sto3g_shell([0.0, 0.0, 0.0]);
+
+        let r_values = vec![1.0, 2.0, 5.0];
+        let expected = vec![
+            7.142217424910036e-01, // R=1.0
+            3.590320602452557e-01, // R=2.0
+            1.651056913935484e-02, // R=5.0
+        ];
+
+        let result = evaluate_overlap_vs_distance(&h_shell, &he_shell, &r_values);
+
+        assert_eq!(result.len(), expected.len());
+        for (computed, reference) in result.iter().zip(expected.iter()) {
+            assert_abs_diff_eq!(computed, reference, epsilon = 1e-10);
+        }
+    }
+
+    // OD-R15: Monotonic decrease for s-s overlap as R increases
+    #[test]
+    fn test_overlap_vs_distance_monotonic_decrease() {
+        let shell = h_1s_sto3g_shell([0.0, 0.0, 0.0]);
+
+        let r_values: Vec<f64> = (1..=100).map(|i| i as f64 * 0.1).collect();
+        let overlaps = evaluate_overlap_vs_distance(&shell, &shell, &r_values);
+
+        for i in 1..overlaps.len() {
+            assert!(
+                overlaps[i] < overlaps[i - 1],
+                "Overlap not monotonically decreasing at R={:.1}: S[{}]={} >= S[{}]={}",
+                r_values[i],
+                i,
+                overlaps[i],
+                i - 1,
+                overlaps[i - 1],
+            );
+        }
+    }
+
+    // OD-R16: Non-negativity for s-s overlap
+    #[test]
+    fn test_overlap_vs_distance_non_negative() {
+        let shell = h_1s_sto3g_shell([0.0, 0.0, 0.0]);
+
+        let r_values: Vec<f64> = (0..=200).map(|i| i as f64 * 0.1).collect();
+        let overlaps = evaluate_overlap_vs_distance(&shell, &shell, &r_values);
+
+        for (i, &s) in overlaps.iter().enumerate() {
+            assert!(
+                s >= 0.0,
+                "Overlap should be non-negative at R={:.1}, got {}",
+                r_values[i],
+                s,
+            );
+        }
+    }
+
+    // OD-R17: Output length equals input length
+    #[test]
+    fn test_overlap_vs_distance_output_length() {
+        let shell = h_1s_sto3g_shell([0.0, 0.0, 0.0]);
+
+        let r_values: Vec<f64> = (0..50).map(|i| i as f64 * 0.2).collect();
+        let result = evaluate_overlap_vs_distance(&shell, &shell, &r_values);
+
+        assert_eq!(result.len(), r_values.len());
+    }
+
+    // OD-R18: Empty r_values returns empty vec
+    #[test]
+    fn test_overlap_vs_distance_empty_input() {
+        let shell = h_1s_sto3g_shell([0.0, 0.0, 0.0]);
+        let result = evaluate_overlap_vs_distance(&shell, &shell, &[]);
+
+        assert!(result.is_empty());
     }
 }

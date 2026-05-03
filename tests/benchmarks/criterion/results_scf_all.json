@@ -1,0 +1,728 @@
+{
+  "metadata": {
+    "generated": "2026-03-29T12:00:00Z",
+    "tool": "criterion 0.5"
+  },
+  "benchmarks": [
+    {
+      "molecule": "H2",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "mean_ms": 0.0056,
+      "nbf": 2,
+      "std_ms": 0.0001
+    },
+    {
+      "molecule": "H2",
+      "basis": "3-21g",
+      "method": "RHF",
+      "mean_ms": 0.0423,
+      "nbf": 4,
+      "std_ms": 0.0
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31g",
+      "method": "RHF",
+      "mean_ms": 0.1137,
+      "nbf": 4,
+      "std_ms": 0.0072
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "mean_ms": 0.1129,
+      "nbf": 4,
+      "std_ms": 0.004
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31+g*",
+      "method": "RHF",
+      "mean_ms": 0.1101,
+      "nbf": 4,
+      "std_ms": 0.0044
+    },
+    {
+      "molecule": "HF",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "mean_ms": 0.0917,
+      "nbf": 6,
+      "std_ms": 0.0063
+    },
+    {
+      "molecule": "HF",
+      "basis": "3-21g",
+      "method": "RHF",
+      "mean_ms": 1.5807,
+      "nbf": 11,
+      "std_ms": 0.0664
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31g",
+      "method": "RHF",
+      "mean_ms": 0.581,
+      "nbf": 11,
+      "std_ms": 0.0357
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "mean_ms": 2.1123,
+      "nbf": 17,
+      "std_ms": 0.0908
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31+g*",
+      "method": "RHF",
+      "mean_ms": 4.098,
+      "nbf": 21,
+      "std_ms": 0.1303
+    },
+    {
+      "molecule": "H2O",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "mean_ms": 0.1323,
+      "nbf": 7,
+      "std_ms": 0.0044
+    },
+    {
+      "molecule": "H2O",
+      "basis": "3-21g",
+      "method": "RHF",
+      "mean_ms": 1.0344,
+      "nbf": 13,
+      "std_ms": 0.0525
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31g",
+      "method": "RHF",
+      "mean_ms": 0.9396,
+      "nbf": 13,
+      "std_ms": 0.0287
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "mean_ms": 2.9653,
+      "nbf": 19,
+      "std_ms": 0.0965
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31+g*",
+      "method": "RHF",
+      "mean_ms": 5.9887,
+      "nbf": 23,
+      "std_ms": 0.0884
+    },
+    {
+      "molecule": "NH3",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "mean_ms": 0.1364,
+      "nbf": 8,
+      "std_ms": 0.0091
+    },
+    {
+      "molecule": "NH3",
+      "basis": "3-21g",
+      "method": "RHF",
+      "mean_ms": 1.2135,
+      "nbf": 15,
+      "std_ms": 0.0725
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31g",
+      "method": "RHF",
+      "mean_ms": 1.05,
+      "nbf": 15,
+      "std_ms": 0.0422
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "mean_ms": 3.3553,
+      "nbf": 21,
+      "std_ms": 0.1504
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31+g*",
+      "method": "RHF",
+      "mean_ms": 7.4466,
+      "nbf": 25,
+      "std_ms": 0.4377
+    },
+    {
+      "molecule": "CH4",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "mean_ms": 0.2261,
+      "nbf": 9,
+      "std_ms": 0.0115
+    },
+    {
+      "molecule": "CH4",
+      "basis": "3-21g",
+      "method": "RHF",
+      "mean_ms": 1.4104,
+      "nbf": 17,
+      "std_ms": 0.0549
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31g",
+      "method": "RHF",
+      "mean_ms": 1.2626,
+      "nbf": 17,
+      "std_ms": 0.0518
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "mean_ms": 18.695,
+      "nbf": 23,
+      "std_ms": 0.7045
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31+g*",
+      "method": "RHF",
+      "mean_ms": 16.269,
+      "nbf": 27,
+      "std_ms": 0.599
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "sto-3g",
+      "method": "RHF",
+      "mean_ms": 20.155,
+      "nbf": 36,
+      "std_ms": 0.7375
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "3-21g",
+      "method": "RHF",
+      "mean_ms": 424.39,
+      "nbf": 66,
+      "std_ms": 11.82
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "6-31g",
+      "method": "RHF",
+      "mean_ms": 440.72,
+      "nbf": 66,
+      "std_ms": 16.86
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "6-31g*",
+      "method": "RHF",
+      "mean_ms": 3326.4,
+      "nbf": 102,
+      "std_ms": 79.85
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "6-31+g*",
+      "method": "RHF",
+      "mean_ms": 8566.1,
+      "nbf": 126,
+      "std_ms": 34.5
+    },
+    {
+      "molecule": "H2",
+      "basis": "sto-3g",
+      "method": "LDA",
+      "mean_ms": 1.9417,
+      "nbf": 2,
+      "std_ms": 0.006
+    },
+    {
+      "molecule": "H2",
+      "basis": "3-21g",
+      "method": "LDA",
+      "mean_ms": 11.202,
+      "nbf": 4,
+      "std_ms": 0.026
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31g",
+      "method": "LDA",
+      "mean_ms": 17.881,
+      "nbf": 4,
+      "std_ms": 0.049
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31g*",
+      "method": "LDA",
+      "mean_ms": 17.817,
+      "nbf": 4,
+      "std_ms": 0.08
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31+g*",
+      "method": "LDA",
+      "mean_ms": 13.295,
+      "nbf": 4,
+      "std_ms": 0.078
+    },
+    {
+      "molecule": "HF",
+      "basis": "sto-3g",
+      "method": "LDA",
+      "mean_ms": 10.696,
+      "nbf": 6,
+      "std_ms": 0.033
+    },
+    {
+      "molecule": "HF",
+      "basis": "3-21g",
+      "method": "LDA",
+      "mean_ms": 61.772,
+      "nbf": 11,
+      "std_ms": 1.476
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31g",
+      "method": "LDA",
+      "mean_ms": 20.9,
+      "nbf": 11,
+      "std_ms": 0.0585
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31g*",
+      "method": "LDA",
+      "mean_ms": 35.025,
+      "nbf": 17,
+      "std_ms": 0.268
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31+g*",
+      "method": "LDA",
+      "mean_ms": 48.786,
+      "nbf": 21,
+      "std_ms": 0.2355
+    },
+    {
+      "molecule": "H2O",
+      "basis": "sto-3g",
+      "method": "LDA",
+      "mean_ms": 17.856,
+      "nbf": 7,
+      "std_ms": 0.072
+    },
+    {
+      "molecule": "H2O",
+      "basis": "3-21g",
+      "method": "LDA",
+      "mean_ms": 39.794,
+      "nbf": 13,
+      "std_ms": 0.142
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31g",
+      "method": "LDA",
+      "mean_ms": 42.147,
+      "nbf": 13,
+      "std_ms": 0.1425
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31g*",
+      "method": "LDA",
+      "mean_ms": 68.25,
+      "nbf": 19,
+      "std_ms": 0.204
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31+g*",
+      "method": "LDA",
+      "mean_ms": 96.532,
+      "nbf": 23,
+      "std_ms": 2.5455
+    },
+    {
+      "molecule": "NH3",
+      "basis": "sto-3g",
+      "method": "LDA",
+      "mean_ms": 29.715,
+      "nbf": 8,
+      "std_ms": 0.16
+    },
+    {
+      "molecule": "NH3",
+      "basis": "3-21g",
+      "method": "LDA",
+      "mean_ms": 60.59,
+      "nbf": 15,
+      "std_ms": 0.2625
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31g",
+      "method": "LDA",
+      "mean_ms": 75.059,
+      "nbf": 15,
+      "std_ms": 0.3165
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31g*",
+      "method": "LDA",
+      "mean_ms": 111.12,
+      "nbf": 21,
+      "std_ms": 0.445
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31+g*",
+      "method": "LDA",
+      "mean_ms": 174.83,
+      "nbf": 25,
+      "std_ms": 0.505
+    },
+    {
+      "molecule": "CH4",
+      "basis": "sto-3g",
+      "method": "LDA",
+      "mean_ms": 49.1,
+      "nbf": 9,
+      "std_ms": 0.1885
+    },
+    {
+      "molecule": "CH4",
+      "basis": "3-21g",
+      "method": "LDA",
+      "mean_ms": 92.294,
+      "nbf": 17,
+      "std_ms": 0.412
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31g",
+      "method": "LDA",
+      "mean_ms": 99.092,
+      "nbf": 17,
+      "std_ms": 2.562
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31g*",
+      "method": "LDA",
+      "mean_ms": 165.71,
+      "nbf": 23,
+      "std_ms": 0.51
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31+g*",
+      "method": "LDA",
+      "mean_ms": 843.53,
+      "nbf": 27,
+      "std_ms": 2.985
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "sto-3g",
+      "method": "LDA",
+      "mean_ms": 651.43,
+      "nbf": 36,
+      "std_ms": 3.945
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "3-21g",
+      "method": "LDA",
+      "mean_ms": 2855.1,
+      "nbf": 66,
+      "std_ms": 10.05
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "6-31g",
+      "method": "LDA",
+      "mean_ms": 2978.4,
+      "nbf": 66,
+      "std_ms": 10.55
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "6-31g*",
+      "method": "LDA",
+      "mean_ms": 7904.9,
+      "nbf": 102,
+      "std_ms": 15.0
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "6-31+g*",
+      "method": "LDA",
+      "mean_ms": 15827.0,
+      "nbf": 126,
+      "std_ms": 38.5
+    },
+    {
+      "molecule": "H2",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "mean_ms": 7.1271,
+      "nbf": 2,
+      "std_ms": 0.0444
+    },
+    {
+      "molecule": "H2",
+      "basis": "3-21g",
+      "method": "B3LYP",
+      "mean_ms": 39.33,
+      "nbf": 4,
+      "std_ms": 0.11
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31g",
+      "method": "B3LYP",
+      "mean_ms": 14.787,
+      "nbf": 4,
+      "std_ms": 0.0595
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31g*",
+      "method": "B3LYP",
+      "mean_ms": 14.738,
+      "nbf": 4,
+      "std_ms": 0.056
+    },
+    {
+      "molecule": "H2",
+      "basis": "6-31+g*",
+      "method": "B3LYP",
+      "mean_ms": 30.642,
+      "nbf": 4,
+      "std_ms": 0.1255
+    },
+    {
+      "molecule": "HF",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "mean_ms": 29.498,
+      "nbf": 6,
+      "std_ms": 0.076
+    },
+    {
+      "molecule": "HF",
+      "basis": "3-21g",
+      "method": "B3LYP",
+      "mean_ms": 78.473,
+      "nbf": 11,
+      "std_ms": 0.229
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31g",
+      "method": "B3LYP",
+      "mean_ms": 33.52,
+      "nbf": 11,
+      "std_ms": 0.19
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31g*",
+      "method": "B3LYP",
+      "mean_ms": 55.208,
+      "nbf": 17,
+      "std_ms": 1.2655
+    },
+    {
+      "molecule": "HF",
+      "basis": "6-31+g*",
+      "method": "B3LYP",
+      "mean_ms": 74.568,
+      "nbf": 21,
+      "std_ms": 0.342
+    },
+    {
+      "molecule": "H2O",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "mean_ms": 33.026,
+      "nbf": 7,
+      "std_ms": 0.0885
+    },
+    {
+      "molecule": "H2O",
+      "basis": "3-21g",
+      "method": "B3LYP",
+      "mean_ms": 50.813,
+      "nbf": 13,
+      "std_ms": 0.2205
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31g",
+      "method": "B3LYP",
+      "mean_ms": 56.449,
+      "nbf": 13,
+      "std_ms": 0.2885
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31g*",
+      "method": "B3LYP",
+      "mean_ms": 80.621,
+      "nbf": 19,
+      "std_ms": 0.183
+    },
+    {
+      "molecule": "H2O",
+      "basis": "6-31+g*",
+      "method": "B3LYP",
+      "mean_ms": 101.91,
+      "nbf": 23,
+      "std_ms": 0.58
+    },
+    {
+      "molecule": "NH3",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "mean_ms": 45.717,
+      "nbf": 8,
+      "std_ms": 0.1925
+    },
+    {
+      "molecule": "NH3",
+      "basis": "3-21g",
+      "method": "B3LYP",
+      "mean_ms": 74.558,
+      "nbf": 15,
+      "std_ms": 1.7505
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31g",
+      "method": "B3LYP",
+      "mean_ms": 80.787,
+      "nbf": 15,
+      "std_ms": 0.653
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31g*",
+      "method": "B3LYP",
+      "mean_ms": 118.51,
+      "nbf": 21,
+      "std_ms": 0.47
+    },
+    {
+      "molecule": "NH3",
+      "basis": "6-31+g*",
+      "method": "B3LYP",
+      "mean_ms": 154.75,
+      "nbf": 25,
+      "std_ms": 1.37
+    },
+    {
+      "molecule": "CH4",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "mean_ms": 73.005,
+      "nbf": 9,
+      "std_ms": 0.683
+    },
+    {
+      "molecule": "CH4",
+      "basis": "3-21g",
+      "method": "B3LYP",
+      "mean_ms": 93.934,
+      "nbf": 17,
+      "std_ms": 0.556
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31g",
+      "method": "B3LYP",
+      "mean_ms": 111.29,
+      "nbf": 17,
+      "std_ms": 0.64
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31g*",
+      "method": "B3LYP",
+      "mean_ms": 263.44,
+      "nbf": 23,
+      "std_ms": 1.485
+    },
+    {
+      "molecule": "CH4",
+      "basis": "6-31+g*",
+      "method": "B3LYP",
+      "mean_ms": 483.92,
+      "nbf": 27,
+      "std_ms": 7.87
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "sto-3g",
+      "method": "B3LYP",
+      "mean_ms": 551.26,
+      "nbf": 36,
+      "std_ms": 1.365
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "3-21g",
+      "method": "B3LYP",
+      "mean_ms": 1561.8,
+      "nbf": 66,
+      "std_ms": 10.75
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "6-31g",
+      "method": "B3LYP",
+      "mean_ms": 1603.2,
+      "nbf": 66,
+      "std_ms": 7.1
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "6-31g*",
+      "method": "B3LYP",
+      "mean_ms": 5519.3,
+      "nbf": 102,
+      "std_ms": 25.2
+    },
+    {
+      "molecule": "C6H6",
+      "basis": "6-31+g*",
+      "method": "B3LYP",
+      "mean_ms": 12504.0,
+      "nbf": 126,
+      "std_ms": 128.5
+    }
+  ]
+}

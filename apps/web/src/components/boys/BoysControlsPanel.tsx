@@ -8,6 +8,7 @@
  */
 
 import { useBoysStore } from '../../stores/boysStore';
+import { getMaxTValue } from '../../lib/boysConstants';
 
 /**
  * Props for BoysControlsPanel.
@@ -33,6 +34,7 @@ interface BoysControlsPanelProps {
 export function BoysControlsPanel({ disabled = false }: BoysControlsPanelProps) {
   const m = useBoysStore((state) => state.m);
   const T = useBoysStore((state) => state.T);
+  const maxT = getMaxTValue(m);
   const view = useBoysStore((state) => state.view);
   const mode = useBoysStore((state) => state.mode);
   const logScale = useBoysStore((state) => state.logScale);
@@ -91,7 +93,7 @@ export function BoysControlsPanel({ disabled = false }: BoysControlsPanelProps) 
         </p>
       </div>
 
-      {/* Argument (T) slider */}
+      {/* Argument (T) slider + numeric input */}
       <div className="mb-6">
         <label
           htmlFor="boys-t-slider"
@@ -103,23 +105,39 @@ export function BoysControlsPanel({ disabled = false }: BoysControlsPanelProps) 
           id="boys-t-slider"
           type="range"
           min={0}
-          max={50}
-          step={0.1}
+          max={maxT}
+          step={0.01}
           value={T}
           onChange={(e) => setT(Number(e.target.value))}
           disabled={disabled}
           className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Argument T slider"
           aria-valuemin={0}
-          aria-valuemax={50}
+          aria-valuemax={maxT}
           aria-valuenow={T}
         />
-        <div className="flex justify-between mt-2">
+        <div className="flex items-center justify-between mt-2">
           <span className="text-xs text-slate-500">0</span>
-          <span className="text-sm font-mono text-slate-700">
-            T = {T.toFixed(1)}
-          </span>
-          <span className="text-xs text-slate-500">50</span>
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-slate-600">T =</span>
+            <input
+              type="number"
+              min={0}
+              max={maxT}
+              step={0.01}
+              value={T}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                if (!isNaN(val) && val >= 0 && val <= maxT) setT(val);
+              }}
+              disabled={disabled}
+              className="w-20 px-2 py-0.5 text-sm font-mono text-center border border-slate-300 rounded
+                focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500
+                disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Argument T numeric input"
+            />
+          </div>
+          <span className="text-xs text-slate-500">{maxT}</span>
         </div>
       </div>
 
@@ -195,11 +213,26 @@ export function BoysControlsPanel({ disabled = false }: BoysControlsPanelProps) 
           >
             Internals
           </button>
+          <button
+            type="button"
+            onClick={() => setMode('multi-order')}
+            disabled={disabled}
+            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
+              mode === 'multi-order'
+                ? 'bg-teal-600 text-white'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            aria-pressed={mode === 'multi-order'}
+          >
+            Multi-Order
+          </button>
         </div>
         <p className="mt-1 text-xs text-slate-500">
           {mode === 'explain'
             ? 'Educational explanations of computation methods'
-            : 'Raw computational details and metrics'}
+            : mode === 'internals'
+              ? 'Raw computational details and metrics'
+              : 'Compare F_0(T) through F_m(T) at current T value'}
         </p>
       </div>
 

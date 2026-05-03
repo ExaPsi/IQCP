@@ -1,0 +1,24 @@
+[package]
+name = "qc-wasm-spectra"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "WebAssembly bindings for frequency analysis (Phase 5 spectra pipeline)"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+qc-core = { path = "../qc-core" }
+qc-io = { path = "../qc-io" }
+wasm-bindgen.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-wasm-bindgen.workspace = true
+js-sys.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+approx.workspace = true
+serde_json.workspace = true

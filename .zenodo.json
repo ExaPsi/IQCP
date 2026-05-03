@@ -1,7 +1,7 @@
 {
   "doi": "10.5281/zenodo.18798310",
   "upload_type": "software",
-  "title": "IQCP: Interactive Quantum Chemistry Playground",
+  "title": "IQCP: Client-Side Quantum Chemistry from SCF to Vibrational Spectra via WebAssembly",
   "creators": [
     {
       "name": "Sawatlon, Boodsarin",
@@ -18,18 +18,24 @@
       "orcid": "0000-0001-5684-0752"
     }
   ],
-  "description": "Browser-based educational tool for exploring Boys functions, Rys quadrature, and SCF convergence through transparent, reproducible computation. All calculations run client-side via WebAssembly with no installation required.",
+  "description": "IQCP is a client-side quantum chemistry engine that compiles a Rust implementation of Hartree-Fock and Kohn-Sham DFT to WebAssembly, executing all numerical work directly in the browser with no server. Supports closed-shell RHF, LDA, B3LYP, and B3LYP-D3(BJ) with six basis sets for elements H-Ar; implements the full pipeline from SCF through analytical gradients, geometry optimization, PES scans, analytical Hessians, vibrational frequencies, IR intensities, semi-analytical Raman activities, and RRHO thermochemistry. Validated against PySCF 2.11.0 across 108 systems with sub-microhartree accuracy.",
   "access_right": "open",
   "license": "MIT",
   "keywords": [
-    "quantum chemistry education",
+    "quantum chemistry",
     "WebAssembly",
-    "self-consistent field",
-    "interactive simulation",
-    "Gaussian integrals",
-    "DIIS convergence",
-    "predict-observe-explain",
-    "algorithm visualization"
+    "Hartree-Fock",
+    "density functional theory",
+    "B3LYP",
+    "analytical gradients",
+    "geometry optimization",
+    "vibrational frequencies",
+    "IR spectroscopy",
+    "Raman spectroscopy",
+    "thermochemistry",
+    "browser-based",
+    "client-side computing",
+    "reproducible research"
   ],
   "related_identifiers": [
     {
@@ -43,5 +49,5 @@
       "resource_type": "other"
     }
   ],
-  "version": "1.0.0-study"
+  "version": "2.0.0"
 }

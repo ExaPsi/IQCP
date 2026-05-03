@@ -2,7 +2,7 @@
 
 **Lab Pack:** 1 - From Boys to Orbitals
 **Version:** 1.0
-**Last Updated:** 2026-01-18
+**Last Updated:** 2026-04-05
 **Estimated Time:** 60-90 minutes
 
 ---
@@ -62,7 +62,7 @@ Your instructor will provide specific submission instructions.
 
 Throughout this worksheet, you will see links that look like:
 
-> **[Click here to open this configuration](https://iqcp.dev/boys?run=...)**
+> **[Click here to open this configuration](https://iqcp.dev/v1/boys?run=...)**
 
 These "deep links" will open IQCP with specific parameter settings already configured. This ensures you see exactly what the worksheet describes. If a link does not work, you can manually set the parameters using the controls in the application.
 
@@ -94,9 +94,9 @@ In this section, you will explore how the Boys function $F_m(T)$ behaves as you 
 
 ### Step 2.1: Getting Started
 
-Open IQCP to the Boys module with the default settings.
+Open IQCP to the Boys Function Lab (Module C) with the default settings.
 
-**[Open: Default Boys View (m=0, T=1.0)](http://localhost:5173/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIg1YosMAO79seAOYKQAX1aksOyTMXEYAD3ZyCFgETk5AA)**
+**[Open: Default Boys View (m=0, T=1.0)](https://iqcp.dev/v1/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIg1YosMAO79seAOYKQAX1aksOyTMXEYAD3ZyCFgETk5AA)**
 
 Familiarize yourself with the interface:
 - The **Controls Panel** on the left allows you to change m and T
@@ -107,7 +107,7 @@ Familiarize yourself with the interface:
 
 Now explore what happens when T is small.
 
-**[Open: Small T (m=0, T=0.5, Internals Mode)](http://localhost:5173/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVfUICsrFFhgB3ftjwBzBSAC+rUlh2SZi4ljx06HgIchouLkA)**
+**[Open: Small T (m=0, T=0.5, Internals Mode)](https://iqcp.dev/v1/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVfUICsrFFhgB3ftjwBzBSAC+rUlh2SZi4ljx06HgIchouLkA)**
 
 Set m = 0 and T = 0.5, then switch to "Internals" mode.
 
@@ -117,7 +117,7 @@ Observe:
 
 Now try an even smaller T value:
 
-**[Open: Very Small T (m=0, T=0.01)](http://localhost:5173/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVfWIasUWGAHd+2PAHMFIAL6tSWHZJmLiMAB7scghYBM7OQA)**
+**[Open: Very Small T (m=0, T=0.01)](https://iqcp.dev/v1/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVfWIasUWGAHd+2PAHMFIAL6tSWHZJmLiMAB7scghYBM7OQA)**
 
 Set T = 0.01 and observe the result.
 
@@ -129,13 +129,13 @@ Set T = 0.01 and observe the result.
 
 Now explore what happens when T becomes larger.
 
-**[Open: Moderate T (m=0, T=15.0, Internals Mode)](http://localhost:5173/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIgwCsrFFhgB3ftjwBzBSAC+rUlh2SZi4ljx06HgIchouLkA)**
+**[Open: Moderate T (m=0, T=15.0, Internals Mode)](https://iqcp.dev/v1/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIgwCsrFFhgB3ftjwBzBSAC+rUlh2SZi4ljx06HgIchouLkA)**
 
 Set T = 15.0 and observe:
 - Which computational method is now being used?
 - How does this differ from what you might see for small T with higher m values?
 
-**[Open: Large T (m=0, T=35.0, Internals Mode)](http://localhost:5173/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIgGYArKxRYYAd37Y8AcwUgAvq1JYdkmYuJY8OnQ8BDkNV1cgA)**
+**[Open: Large T (m=0, T=35.0, Internals Mode)](https://iqcp.dev/v1/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIgGYArKxRYYAd37Y8AcwUgAvq1JYdkmYuJY8OnQ8BDkNV1cgA)**
 
 Now increase T to 35.0 and observe.
 
@@ -156,7 +156,7 @@ Now increase T to 35.0 and observe.
 
 The Boys function has an order parameter $m$. Let us see how this affects the function.
 
-**[Open: Higher Order m (m=5, T=10.0)](http://localhost:5173/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgFZWAFSIMBrFFhgB3ftjwBzBSAC+rUlh2SZi4ljx06HgIchouLkA)**
+**[Open: Higher Order m (m=5, T=10.0)](https://iqcp.dev/v1/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgFZWAFSIMBrFFhgB3ftjwBzBSAC+rUlh2SZi4ljx06HgIchouLkA)**
 
 Set m = 5 and T = 10.0.
 
@@ -168,7 +168,7 @@ _______________________________________________
 
 ### Step 2.5: Regime Boundaries
 
-**[Open: Regime Boundary (m=0, T=10.0, Internals Mode)](http://localhost:5173/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIgwMgUWGAHd+2PAHMFIAL6tSWHZJmLiMAB7scghYBM7OQA)**
+**[Open: Regime Boundary (m=0, T=10.0, Internals Mode)](https://iqcp.dev/v1/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIgwMgUWGAHd+2PAHMFIAL6tSWHZJmLiMAB7scghYBM7OQA)**
 
 Set T = 12.0 (near the series/recurrence boundary).
 
@@ -192,11 +192,11 @@ The lecture notes describe **three theoretical regimes** for computing Boys func
 
 However, IQCP (following libcint) uses a **two-method implementation** with $m$-dependent turnover points.
 
-**[Open: Compare m=0 at T=35 (Internals Mode)](http://localhost:5173/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIgGYArKxRYYAd37Y8AcwUgAvq1JYdkmYuJY8OnQ8BDkNV1cgA)**
+**[Open: Compare m=0 at T=35 (Internals Mode)](https://iqcp.dev/v1/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgNYAVIgGYArKxRYYAd37Y8AcwUgAvq1JYdkmYuJY8OnQ8BDkNV1cgA)**
 
 Set $m=0$ and $T=35.0$ in Internals mode. According to the theoretical table, this would be in the "Large $T$ / Asymptotic" regime (since $35 \ge 30+5 \times 0 = 30$).
 
-**[Open: Compare m=5 at T=45 (Internals Mode)](http://localhost:5173/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgFZWAFSIAWQyBRYYAd37Y8AcwUgAvq1JYdkmYuJY8OnQ8BDkNV1cgA)**
+**[Open: Compare m=5 at T=45 (Internals Mode)](https://iqcp.dev/v1/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgFZWAFSIAWQyBRYYAd37Y8AcwUgAvq1JYdkmYuJY8OnQ8BDkNV1cgA)**
 
 Now set $m=5$ and $T=45.0$. According to the theoretical table, this would be in the "Moderate $T$" regime (since $30+5 \times 5 = 55$, and $45 < 55$).
 
@@ -220,7 +220,7 @@ _______________________________________________
 
 Before moving on, export a run artifact to document your exploration.
 
-**[Open: Checkpoint State (m=3, T=9.5)](http://localhost:5173/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgGZWAFSIBOIQFZWKLDADu-bHgDmCkAF9WpLDskzFxFh4dOh4CHIa7u5AA)**
+**[Open: Checkpoint State (m=3, T=9.5)](https://iqcp.dev/v1/boys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj8ARjgCeYCSvVFQcIgGZWAFSIBOIQFZWKLDADu-bHgDmCkAF9WpLDskzFxFh4dOh4CHIa7u5AA)**
 
 1. Set m = 3 and T = 9.5
 2. Click the **Export** button
@@ -236,9 +236,9 @@ Rys quadrature is a specialized numerical integration technique used to evaluate
 
 ### Step 3.1: Introduction to Rys Quadrature
 
-**[Open: Default Rys View (n=3, T=10.0)](http://localhost:5173/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEAzKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
+**[Open: Default Rys View (n=3, T=10.0)](https://iqcp.dev/v1/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEAzKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
 
-Open the Rys module and observe the interface:
+Open the Rys Quadrature Lab (Module D) and observe the interface:
 - The **Controls Panel** lets you adjust the quadrature order $n$ and the parameter $T$
 - The **Roots/Weights Table** shows the quadrature points and their weights
 - The **Error Curve** (when visible) shows reconstruction error vs. order
@@ -249,7 +249,7 @@ $$\int_0^1 f(t^2) \, e^{-Tt^2} \, dt \approx \sum_{i=1}^n w_i \, f(t_i^2)$$
 
 ### Step 3.2: Inspecting Roots and Weights
 
-**[Open: Roots and Weights Inspection (n=5, T=10.0, Internals Mode)](http://localhost:5173/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
+**[Open: Roots and Weights Inspection (n=5, T=10.0, Internals Mode)](https://iqcp.dev/v1/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
 
 Set n = 5 and T = 10.0, then switch to Internals mode.
 
@@ -259,7 +259,7 @@ Set n = 5 and T = 10.0, then switch to Internals mode.
 - Roots in (0, 1)? _______________________________________________
 - Weights positive? _______________________________________________
 
-**[Open: High Quadrature Order (n=7, T=10.0, Internals Mode)](http://localhost:5173/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEA7KwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
+**[Open: High Quadrature Order (n=7, T=10.0, Internals Mode)](https://iqcp.dev/v1/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEA7KwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
 
 Increase the order to n = 10 and compare.
 
@@ -273,7 +273,7 @@ _______________________________________________
 
 The reconstruction error measures how accurately the quadrature can reproduce the exact integral moments.
 
-**[Open: Error Curve at T=10.0 (n=5, T=10.0, Explain Mode)](http://localhost:5173/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
+**[Open: Error Curve at T=10.0 (n=5, T=10.0, Explain Mode)](https://iqcp.dev/v1/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
 
 In Explain mode, observe the error curve or error information displayed.
 
@@ -284,17 +284,17 @@ In Explain mode, observe the error curve or error information displayed.
 - n=5: _______________________________________________
 - n=7: _______________________________________________
 
-**[Open: Error Curve at T=25.0 (n=3, T=25.0)](http://localhost:5173/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEAzKwAqRAEwBWVjXQBzGFX4MYAWgBsIAL6tSWIqCnTFxDAAHuxyCFgEbm5AA)**
+**[Open: Error Curve at T=25.0 (n=3, T=25.0)](https://iqcp.dev/v1/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEAzKwAqRAEwBWVjXQBzGFX4MYAWgBsIAL6tSWIqCnTFxDAAHuxyCFgEbm5AA)**
 
 Change T to 25.0 and observe how the error behavior changes.
 
 ### Step 3.4: Choosing Optimal Quadrature Order
 
-**[Open: Target 1e-6 Accuracy (n=5, T=10.0)](http://localhost:5173/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
+**[Open: Target 1e-6 Accuracy (n=5, T=10.0)](https://iqcp.dev/v1/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
 
 With T = 10.0, use the target accuracy selector to set the target to 1e-6.
 
-**[Open: Target 1e-8 Accuracy (n=5, T=15.0)](http://localhost:5173/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBvpA10AcxhV+DGAFoAHCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
+**[Open: Target 1e-8 Accuracy (n=5, T=15.0)](https://iqcp.dev/v1/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBvpA10AcxhV+DGAFoAHCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
 
 Now change the target to 1e-8.
 
@@ -320,7 +320,7 @@ $$n_r = \lfloor L/2 \rfloor + 1$$
 
 where $L = l_A + l_B + l_C + l_D$ is the sum of angular momenta for the four shells in an electron repulsion integral $(ab|cd)$.
 
-**[Open: Shell Quartet Selector (Internals Mode)](http://localhost:5173/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEAzKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
+**[Open: Shell Quartet Selector (Internals Mode)](https://iqcp.dev/v1/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEAzKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
 
 Using the shell quartet selector in the Internals panel, try different shell combinations.
 
@@ -332,7 +332,7 @@ Using the shell quartet selector in the Internals panel, try different shell com
 - Formula check: floor(___/2) + 1 = _______________
 - Do they match? _______________
 
-**[Open: (dd|pp) Shell Quartet](http://localhost:5173/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEALKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
+**[Open: (dd|pp) Shell Quartet](https://iqcp.dev/v1/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEALKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
 
 Now try (dd|pp).
 
@@ -354,7 +354,7 @@ The lecture notes describe **Algorithm 5.1** for computing Rys nodes and weights
 5. Build Jacobi matrix: $J = C H^{(1)} C^T$
 6. Eigendecomposition: nodes = eigenvalues, weights = $\mu_0 \cdot (V_{0i})^2$
 
-**[Open: Algorithm 5.1 Internals (n=3, T=10)](http://localhost:5173/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEAzKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
+**[Open: Algorithm 5.1 Internals (n=3, T=10)](https://iqcp.dev/v1/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEAzKwAqRBgNY10AcxhV+DGAFoAbCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
 
 Set n=3 and T=10, then examine the Algorithm 5.1 pipeline in the Internals panel.
 
@@ -372,9 +372,9 @@ Set n=3 and T=10, then examine the Algorithm 5.1 pipeline in the Internals panel
 
 ### Checkpoint: Rys Quadrature Artifact
 
-Export a run artifact for the Rys module.
+Export a run artifact for the Rys Quadrature Lab (Module D).
 
-**[Open: Checkpoint State (n=5, T=15.0, target=1e-8)](http://localhost:5173/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBvpA10AcxhV+DGAFoAHCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
+**[Open: Checkpoint State (n=5, T=15.0, target=1e-8)](https://iqcp.dev/v1/rys?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj90ATzASVawqAKEArKwAqRBvpA10AcxhV+DGAFoAHCAC+rUliKgp0xcRgAHuxyCFgELi5AA)**
 
 1. Set T = 15.0 with target accuracy 1e-8
 2. Note the recommended order
@@ -390,9 +390,9 @@ The Self-Consistent Field (SCF) method is the workhorse of computational quantum
 
 ### Step 4.1: Understanding the SCF Process
 
-**[Open: H2 Default Run (medium convergence, DIIS enabled)](http://localhost:5173/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJkpUcAZgDmSdKIAsExAA99ddEQCsA1hHwp+OBhpLFI4CRCsMCIqMhgAX1ZSLA1JGUViGGd2OQQsAnj4oA)**
+**[Open: H2 Default Run (medium convergence, DIIS enabled)](https://iqcp.dev/v1/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJkpUcAZgDmSdKIAsExAA99ddEQCsA1hHwp+OBhpLFI4CRCsMCIqMhgAX1ZSLA1JGUViGGd2OQQsAnj4oA)**
 
-Open the SCF module with the default H2 molecule.
+Open the SCF Sandbox (Module E) with the default H2 molecule.
 
 The SCF procedure works as follows:
 1. Start with an initial guess for the density matrix
@@ -413,13 +413,13 @@ Observe the iteration table and convergence plot.
 
 Now let us compare convergence with and without DIIS.
 
-**[Open: H2 Tight Convergence WITHOUT DIIS](http://localhost:5173/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJkpUcAZgDmSdKIAsExAA99ddEQCsA1hHwp+KiwrKCoJaSwsMCJlBDkwGABfVlIsDUkZRWIYZ3Y5BCwCRMSgA)**
+**[Open: H2 Tight Convergence WITHOUT DIIS](https://iqcp.dev/v1/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJkpUcAZgDmSdKIAsExAA99ddEQCsA1hHwp+KiwrKCoJaSwsMCJlBDkwGABfVlIsDUkZRWIYZ3Y5BCwCRMSgA)**
 
 Set convergence to "tight" and DIIS to OFF. Run the calculation and observe:
 - How many iterations?
 - What is the convergence pattern?
 
-**[Open: H2 Tight Convergence WITH DIIS](http://localhost:5173/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJkpUcAZgDmSdKIAsExAA99ddEQCsA1hHwp+KiwrKCoJaSwsMCIqMhgAX1ZSLA1JGUViGGd2OQQsAnj4oA)**
+**[Open: H2 Tight Convergence WITH DIIS](https://iqcp.dev/v1/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJkpUcAZgDmSdKIAsExAA99ddEQCsA1hHwp+KiwrKCoJaSwsMCIqMhgAX1ZSLA1JGUViGGd2OQQsAnj4oA)**
 
 Now enable DIIS and run again.
 
@@ -439,11 +439,11 @@ _______________________________________________
 
 ### Step 4.3: Larger Molecule - Water
 
-**[Open: H2O WITHOUT DIIS](http://localhost:5173/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJhyUqOAMwBzCYgAe+uuiIBWAawj4U-ODGlYpHASAVhgRMoIcmAwAL6spFgakjKKxDD27HIIWASxsUA)**
+**[Open: H2O WITHOUT DIIS](https://iqcp.dev/v1/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJhyUqOAMwBzCYgAe+uuiIBWAawj4U-ODGlYpHASAVhgRMoIcmAwAL6spFgakjKKxDD27HIIWASxsUA)**
 
 Now switch to H2O (water molecule) without DIIS.
 
-**[Open: H2O WITH DIIS](http://localhost:5173/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJhyUqOAMwBzCYgAe+uuiIBWAawj4U-ODGlYpHASAVhgRFRkMAC+rKRYGpIyisQw9uxyCFgE0dFAA)**
+**[Open: H2O WITH DIIS](https://iqcp.dev/v1/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJhyUqOAMwBzCYgAe+uuiIBWAawj4U-ODGlYpHASAVhgRFRkMAC+rKRYGpIyisQw9uxyCFgE0dFAA)**
 
 Now enable DIIS for H2O.
 
@@ -456,7 +456,7 @@ Now enable DIIS for H2O.
 
 ### Step 4.4: Inspecting SCF Internals
 
-**[Open: H2 Matrix Inspection (Internals Mode)](http://localhost:5173/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJkpUcAZgDmSdKIAsExAA99ddEQCsA1hHwp+OBhpLFI4CRCsMCIqMhgAX1ZSLA1JGUViLDx3PAQ5aPj4oA)**
+**[Open: H2 Matrix Inspection (Internals Mode)](https://iqcp.dev/v1/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJkpUcAZgDmSdKIAsExAA99ddEQCsA1hHwp+OBhpLFI4CRCsMCIqMhgAX1ZSLA1JGUViLDx3PAQ5aPj4oA)**
 
 Switch to Internals mode and examine the matrices.
 
@@ -479,7 +479,7 @@ Still in the H2 calculation, look at the orbital energies (eigenvalues of the Fo
 
 ### Step 4.6: A More Complex System
 
-**[Open: LiH System (Internals Mode)](http://localhost:5173/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn85WKJSo4AzAHMJiAB7666IgFYBrCPhT84MaVlI4CX8sMCIqMhgAX1ZSLA1JGUViGDt2OQQsAiiooA)**
+**[Open: LiH System (Internals Mode)](https://iqcp.dev/v1/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn85WKJSo4AzAHMJiAB7666IgFYBrCPhT84MaVlI4CX8sMCIqMhgAX1ZSLA1JGUViGDt2OQQsAiiooA)**
 
 Try the LiH (lithium hydride) system.
 
@@ -491,13 +491,15 @@ _______________________________________________
 
 _______________________________________________
 
+> **Going Deeper:** The SCF Sandbox also supports DFT methods (LDA, B3LYP), multiple basis sets (STO-3G through cc-pVDZ), geometry optimization, potential energy surface scanning, and 3D orbital visualization. These features are explored in **Lab Pack #2: 3D Exploration, PES, and Orbitals**.
+
 ---
 
 ### Checkpoint: SCF Artifact
 
 Export your final SCF run artifact.
 
-**[Open: Checkpoint State (H2O with DIIS)](http://localhost:5173/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJhyUqOAMwBzCYgAe+uuiIBWAawj4U-ODGlYpHASAVhgRFRkMAC+rKRYGpIyisQw9uxyCFgE0dFAA)**
+**[Open: Checkpoint State (H2O with DIIS)](https://iqcp.dev/v1/scf?run=N4IgzgxgFgpgtgQwPoDcYCcwEsD2A7EALhHQFc8kwAXBKmVARhABoQEAHd1DbfIkAAwA6BkIEsQcHABNSAGxj9IAMwkqioMAE9q8JFmn8oAJhyUqOAMwBzCYgAe+uuiIBWAawj4U-ODGlYpHASAVhgRFRkMAC+rKRYGpIyisQw9uxyCFgE0dFAA)**
 
 1. Run H2O with medium convergence and DIIS enabled
 2. Switch to Internals mode to ensure matrix data is captured

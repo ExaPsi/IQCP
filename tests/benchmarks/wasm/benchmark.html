@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IQCP WASM Benchmark</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --surface: #16213e;
+      --border: #0f3460;
+      --text: #e0e0e0;
+      --accent: #53a8b6;
+      --green: #4ade80;
+      --red: #f87171;
+      --yellow: #fbbf24;
+      --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 { color: var(--accent); margin-bottom: 0.5rem; }
+    .subtitle { color: #888; margin-bottom: 1.5rem; }
+    .controls {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    button {
+      font-family: inherit;
+      font-size: 0.95rem;
+      padding: 0.6rem 1.2rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    button:hover:not(:disabled) {
+      background: var(--border);
+      border-color: var(--accent);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    button.primary {
+      background: var(--accent);
+      color: #000;
+      font-weight: 600;
+      border-color: var(--accent);
+    }
+    button.primary:hover:not(:disabled) {
+      background: #6bc0ce;
+    }
+    .status {
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+    }
+    .status.pending { background: #333; color: #888; }
+    .status.loading { background: #1e3a5f; color: var(--yellow); }
+    .status.ready { background: #1e3a1e; color: var(--green); }
+    .status.error { background: #3a1e1e; color: var(--red); }
+    .status.running { background: #3a2e1e; color: var(--yellow); }
+    #progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--surface);
+      border-radius: 3px;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+      display: none;
+    }
+    #progress-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.2s;
+      border-radius: 3px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+    th {
+      text-align: left;
+      padding: 0.6rem 0.8rem;
+      background: var(--surface);
+      border-bottom: 2px solid var(--border);
+      color: var(--accent);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    th.num { text-align: right; }
+    td {
+      padding: 0.5rem 0.8rem;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.name { font-weight: 500; }
+    td.valid { color: var(--green); }
+    td.invalid { color: var(--red); }
+    tr.category-header td {
+      background: var(--surface);
+      font-weight: 600;
+      color: var(--accent);
+      padding-top: 0.8rem;
+      border-bottom: 1px solid var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.8rem;
+    }
+    tr:hover td:not(.category-header td) {
+      background: rgba(83, 168, 182, 0.05);
+    }
+    .validation-info {
+      font-size: 0.75rem;
+      color: #888;
+      display: block;
+      margin-top: 2px;
+      font-weight: 400;
+    }
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      line-height: 1.5;
+      max-height: 400px;
+      overflow-y: auto;
+      display: none;
+      margin-bottom: 1.5rem;
+    }
+    .info {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .info code {
+      font-family: var(--mono);
+      background: rgba(83, 168, 182, 0.15);
+      padding: 0.15em 0.4em;
+      border-radius: 3px;
+      font-size: 0.85em;
+    }
+    .config {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .config label {
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+    .config input {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      width: 60px;
+      padding: 0.3rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--text);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>IQCP WASM Benchmark Harness</h1>
+  <p class="subtitle">Wall-clock timing measurements for JCIM manuscript (M2)</p>
+
+  <div class="info">
+    <strong>Purpose:</strong> Measure WASM computation times for SCF, gradient, and
+    optimization calculations. Results are compared against native Rust (Criterion)
+    and PySCF timings.
+    <br />
+    <strong>Methodology:</strong> Each case runs <code>N_WARMUP</code> warmup iterations
+    (discarded), then <code>N_RUNS</code> timed iterations using
+    <code>performance.now()</code>. WASM module is loaded and initialized before
+    benchmarks begin.
+  </div>
+
+  <div class="config">
+    <label>Warmup runs: <input type="number" id="n-warmup" value="2" min="0" max="20" /></label>
+    <label>Timed runs: <input type="number" id="n-runs" value="10" min="1" max="100" /></label>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="btn-run" disabled>Run Benchmarks</button>
+    <button id="btn-download" disabled>Download JSON</button>
+    <button id="btn-toggle-raw" disabled>Show Raw JSON</button>
+    <span id="status" class="status pending">Initializing WASM...</span>
+  </div>
+
+  <div id="progress-bar"><div id="progress-fill" style="width: 0%"></div></div>
+
+  <table id="results-table">
+    <thead>
+      <tr>
+        <th>Benchmark</th>
+        <th class="num">Mean (ms)</th>
+        <th class="num">Std (ms)</th>
+        <th class="num">Min (ms)</th>
+        <th class="num">Max (ms)</th>
+        <th>Valid</th>
+      </tr>
+    </thead>
+    <tbody id="results-body">
+      <tr><td colspan="6" style="color: #666; padding: 2rem; text-align: center;">
+        Click "Run Benchmarks" to start
+      </td></tr>
+    </tbody>
+  </table>
+
+  <pre id="raw-json"></pre>
+
+  <script type="module">
+    // ========================================================================
+    // WASM Module Loading
+    // ========================================================================
+
+    // The WASM module JS glue code and binary are in apps/web/src/wasm/.
+    // We use a relative path that works when this HTML is served from
+    // the project root (e.g., via `python -m http.server` or Vite).
+    //
+    // For the standalone page, we load the WASM JS module which exports
+    // `default` (the async init function) and all exported functions.
+
+    const WASM_JS_PATH = '../../../apps/web/src/wasm/qc_wasm.js';
+    const WASM_BIN_PATH = '../../../apps/web/src/wasm/qc_wasm_bg.wasm';
+
+    const statusEl = document.getElementById('status');
+    const btnRun = document.getElementById('btn-run');
+    const btnDownload = document.getElementById('btn-download');
+    const btnToggleRaw = document.getElementById('btn-toggle-raw');
+    const progressBar = document.getElementById('progress-bar');
+    const progressFill = document.getElementById('progress-fill');
+    const resultsBody = document.getElementById('results-body');
+    const rawJsonEl = document.getElementById('raw-json');
+
+    let wasmModule = null;
+    let wasmSizeBytes = null;
+    let suiteResult = null;
+
+    function setStatus(text, cls) {
+      statusEl.textContent = text;
+      statusEl.className = 'status ' + cls;
+    }
+
+    // Load and initialize WASM
+    async function initWasm() {
+      try {
+        setStatus('Loading WASM module...', 'loading');
+
+        // Fetch WASM binary size for metadata
+        try {
+          const headResp = await fetch(WASM_BIN_PATH, { method: 'HEAD' });
+          const cl = headResp.headers.get('content-length');
+          if (cl) wasmSizeBytes = parseInt(cl, 10);
+        } catch {
+          // Size check is non-critical
+        }
+
+        // Import the WASM JS module
+        const wasm = await import(WASM_JS_PATH);
+
+        // Initialize the WASM module (loads and compiles the .wasm binary)
+        await wasm.default();
+
+        // Build the WasmModule interface
+        wasmModule = {
+          ks_scf: wasm.ks_scf,
+          optimize_geometry: wasm.optimize_geometry,
+          version: wasm.version,
+        };
+
+        const ver = wasmModule.version();
+        setStatus(`WASM ready (v${ver})`, 'ready');
+        btnRun.disabled = false;
+      } catch (e) {
+        console.error('WASM initialization failed:', e);
+        setStatus(`WASM init failed: ${e.message}`, 'error');
+      }
+    }
+
+    // ========================================================================
+    // Benchmark Cases (inline, matching benchmark.ts)
+    // ========================================================================
+
+    const MOLECULES = {
+      H2: {
+        atoms: [[1,0,0,0], [1,0,0,1.4]],
+      },
+      H2O: {
+        atoms: [
+          [8, 0.0, 0.0, 0.2217282],
+          [1, 0.0, 1.4305447, -0.8869128],
+          [1, 0.0, -1.4305447, -0.8869128],
+        ],
+      },
+      CH4: {
+        atoms: [
+          [6, 0, 0, 0],
+          [1, 1.1851, 1.1851, 1.1851],
+          [1, -1.1851, -1.1851, 1.1851],
+          [1, -1.1851, 1.1851, -1.1851],
+          [1, 1.1851, -1.1851, -1.1851],
+        ],
+      },
+    };
+
+    function ksInput(atoms, basis, method) {
+      return {
+        atoms, basisName: basis, method,
+        convergenceProfile: 'tight',
+        maxIterations: 100,
+        useDiis: true,
+        gridQuality: 'standard',
+        useSpherical: false,
+      };
+    }
+
+    function optInput(atoms, basis, method) {
+      return {
+        atoms, basisName: basis, method,
+        maxSteps: 50,
+        gradThreshold: 4.5e-4,
+        energyThreshold: 1.0e-6,
+        memorySize: 7,
+      };
+    }
+
+    const CASES = [
+      {
+        name: 'scf_h2_sto3g_rhf',
+        description: 'H2 RHF/STO-3G full SCF',
+        category: 'scf',
+        run: (w) => w.ks_scf(ksInput(MOLECULES.H2.atoms, 'sto-3g', 'rhf')),
+      },
+      {
+        name: 'scf_h2o_sto3g_rhf',
+        description: 'H2O RHF/STO-3G full SCF',
+        category: 'scf',
+        run: (w) => w.ks_scf(ksInput(MOLECULES.H2O.atoms, 'sto-3g', 'rhf')),
+      },
+      {
+        name: 'scf_h2o_631gs_rhf',
+        description: 'H2O RHF/6-31G* full SCF',
+        category: 'scf',
+        run: (w) => w.ks_scf(ksInput(MOLECULES.H2O.atoms, '6-31g*', 'rhf')),
+      },
+      {
+        name: 'scf_h2o_631gs_b3lyp',
+        description: 'H2O B3LYP/6-31G* full SCF',
+        category: 'scf',
+        run: (w) => w.ks_scf(ksInput(MOLECULES.H2O.atoms, '6-31g*', 'b3lyp')),
+      },
+      {
+        name: 'scf_ch4_631gs_b3lyp',
+        description: 'CH4 B3LYP/6-31G* full SCF',
+        category: 'scf',
+        run: (w) => w.ks_scf(ksInput(MOLECULES.CH4.atoms, '6-31g*', 'b3lyp')),
+      },
+      {
+        name: 'opt_h2o_sto3g_rhf',
+        description: 'H2O RHF/STO-3G geometry optimization',
+        category: 'optimization',
+        run: (w) => w.optimize_geometry(optInput(MOLECULES.H2O.atoms, 'sto-3g', 'rhf'), () => {}),
+      },
+      {
+        name: 'opt_h2o_631gs_b3lyp',
+        description: 'H2O B3LYP/6-31G* geometry optimization',
+        category: 'optimization',
+        run: (w) => w.optimize_geometry(optInput(MOLECULES.H2O.atoms, '6-31g*', 'b3lyp'), () => {}),
+      },
+    ];
+
+    // ========================================================================
+    // Statistics
+    // ========================================================================
+
+    function computeMean(vals) {
+      return vals.length === 0 ? 0 : vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
+    function computeStd(vals) {
+      if (vals.length <= 1) return 0;
+      const m = computeMean(vals);
+      return Math.sqrt(vals.reduce((s, v) => s + (v - m) ** 2, 0) / (vals.length - 1));
+    }
+
+    // ========================================================================
+    // Run Benchmarks
+    // ========================================================================
+
+    function extractEnergy(r) {
+      return r && typeof r === 'object' && 'energy' in r ? r.energy : null;
+    }
+    function isConverged(r) {
+      return r && typeof r === 'object' && 'converged' in r ? r.converged : false;
+    }
+
+    async function runBenchmarks() {
+      if (!wasmModule) return;
+
+      const nWarmup = parseInt(document.getElementById('n-warmup').value, 10) || 2;
+      const nRuns = parseInt(document.getElementById('n-runs').value, 10) || 10;
+
+      btnRun.disabled = true;
+      btnDownload.disabled = true;
+      btnToggleRaw.disabled = true;
+      progressBar.style.display = 'block';
+
+      const results = [];
+      const totalSteps = CASES.length * (nWarmup + nRuns);
+      let currentStep = 0;
+
+      for (let ci = 0; ci < CASES.length; ci++) {
+        const c = CASES[ci];
+        setStatus(`Running ${c.name} (warmup)...`, 'running');
+
+        let lastResult = null;
+        let errorMsg = null;
+
+        // Warmup
+        for (let w = 0; w < nWarmup; w++) {
+          currentStep++;
+          progressFill.style.width = ((currentStep / totalSteps) * 100) + '%';
+          try {
+            lastResult = c.run(wasmModule);
+          } catch (e) {
+            errorMsg = e.message || String(e);
+            break;
+          }
+          // Yield to UI between runs
+          await new Promise(r => setTimeout(r, 0));
+        }
+
+        if (errorMsg) {
+          results.push({
+            name: c.name, description: c.description, category: c.category,
+            n_warmup: nWarmup, n_runs: nRuns,
+            mean_ms: 0, std_ms: 0, min_ms: 0, max_ms: 0,
+            times_ms: [], valid: false,
+            validation_info: 'Error: ' + errorMsg,
+          });
+          currentStep += nRuns;
+          progressFill.style.width = ((currentStep / totalSteps) * 100) + '%';
+          continue;
+        }
+
+        // Timing
+        setStatus(`Running ${c.name} (timing 0/${nRuns})...`, 'running');
+        const times = [];
+        for (let r = 0; r < nRuns; r++) {
+          currentStep++;
+          progressFill.style.width = ((currentStep / totalSteps) * 100) + '%';
+          setStatus(`Running ${c.name} (timing ${r + 1}/${nRuns})...`, 'running');
+
+          const t0 = performance.now();
+          try {
+            lastResult = c.run(wasmModule);
+          } catch (e) {
+            errorMsg = e.message || String(e);
+            break;
+          }
+          const t1 = performance.now();
+          times.push(t1 - t0);
+
+          // Yield to UI
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        if (errorMsg) {
+          results.push({
+            name: c.name, description: c.description, category: c.category,
+            n_warmup: nWarmup, n_runs: nRuns,
+            mean_ms: 0, std_ms: 0, min_ms: 0, max_ms: 0,
+            times_ms: times, valid: false,
+            validation_info: 'Error: ' + errorMsg,
+          });
+          continue;
+        }
+
+        const energy = extractEnergy(lastResult);
+        const converged = isConverged(lastResult);
+        const validationInfo = energy !== null
+          ? `E = ${energy.toFixed(10)} Ha, converged = ${converged}`
+          : 'no energy in result';
+
+        results.push({
+          name: c.name,
+          description: c.description,
+          category: c.category,
+          n_warmup: nWarmup,
+          n_runs: nRuns,
+          mean_ms: computeMean(times),
+          std_ms: computeStd(times),
+          min_ms: Math.min(...times),
+          max_ms: Math.max(...times),
+          times_ms: times.map(t => Math.round(t * 100) / 100),
+          valid: true,
+          validation_info: validationInfo,
+        });
+      }
+
+      // Detect browser
+      const ua = navigator.userAgent;
+      let browser = 'Unknown';
+      if (ua.includes('Firefox/')) {
+        const m = ua.match(/Firefox\/([\d.]+)/); browser = m ? `Firefox ${m[1]}` : 'Firefox';
+      } else if (ua.includes('Edg/')) {
+        const m = ua.match(/Edg\/([\d.]+)/); browser = m ? `Edge ${m[1]}` : 'Edge';
+      } else if (ua.includes('Chrome/')) {
+        const m = ua.match(/Chrome\/([\d.]+)/); browser = m ? `Chrome ${m[1]}` : 'Chrome';
+      } else if (ua.includes('Safari/')) {
+        const m = ua.match(/Version\/([\d.]+)/); browser = m ? `Safari ${m[1]}` : 'Safari';
+      }
+
+      let wasmVer = 'unknown';
+      try { wasmVer = wasmModule.version(); } catch {}
+
+      suiteResult = {
+        metadata: {
+          browser,
+          platform: navigator.platform || 'Unknown',
+          date: new Date().toISOString().split('T')[0],
+          user_agent: ua,
+          wasm_module_size_bytes: wasmSizeBytes,
+          wasm_version: wasmVer,
+          n_warmup: nWarmup,
+          n_runs: nRuns,
+        },
+        benchmarks: results,
+      };
+
+      // Render table
+      renderResults(results);
+
+      // Update raw JSON
+      rawJsonEl.textContent = JSON.stringify(suiteResult, null, 2);
+
+      setStatus(`Done: ${results.length} benchmarks completed`, 'ready');
+      btnRun.disabled = false;
+      btnDownload.disabled = false;
+      btnToggleRaw.disabled = false;
+      progressBar.style.display = 'none';
+    }
+
+    // ========================================================================
+    // Render Results Table
+    // ========================================================================
+
+    function renderResults(results) {
+      resultsBody.innerHTML = '';
+
+      // Group by category
+      const categories = ['scf', 'gradient', 'optimization'];
+      const categoryLabels = { scf: 'SCF Calculations', gradient: 'Gradient Calculations', optimization: 'Geometry Optimizations' };
+
+      for (const cat of categories) {
+        const catResults = results.filter(r => r.category === cat);
+        if (catResults.length === 0) continue;
+
+        // Category header row
+        const headerRow = document.createElement('tr');
+        headerRow.className = 'category-header';
+        headerRow.innerHTML = `<td colspan="6">${categoryLabels[cat] || cat}</td>`;
+        resultsBody.appendChild(headerRow);
+
+        for (const r of catResults) {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td class="name">
+              ${r.description}
+              ${r.validation_info ? `<span class="validation-info">${r.validation_info}</span>` : ''}
+            </td>
+            <td class="num">${r.valid ? r.mean_ms.toFixed(2) : '-'}</td>
+            <td class="num">${r.valid ? r.std_ms.toFixed(2) : '-'}</td>
+            <td class="num">${r.valid ? r.min_ms.toFixed(2) : '-'}</td>
+            <td class="num">${r.valid ? r.max_ms.toFixed(2) : '-'}</td>
+            <td class="${r.valid ? 'valid' : 'invalid'}">${r.valid ? 'YES' : 'NO'}</td>
+          `;
+          resultsBody.appendChild(row);
+        }
+      }
+    }
+
+    // ========================================================================
+    // Download JSON
+    // ========================================================================
+
+    function downloadJson() {
+      if (!suiteResult) return;
+      const blob = new Blob([JSON.stringify(suiteResult, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const date = suiteResult.metadata.date;
+      const browser = suiteResult.metadata.browser.replace(/\s+/g, '-').toLowerCase();
+      a.download = `wasm_benchmark_${date}_${browser}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function toggleRaw() {
+      const isVisible = rawJsonEl.style.display === 'block';
+      rawJsonEl.style.display = isVisible ? 'none' : 'block';
+      btnToggleRaw.textContent = isVisible ? 'Show Raw JSON' : 'Hide Raw JSON';
+    }
+
+    // ========================================================================
+    // Event Listeners
+    // ========================================================================
+
+    btnRun.addEventListener('click', runBenchmarks);
+    btnDownload.addEventListener('click', downloadJson);
+    btnToggleRaw.addEventListener('click', toggleRaw);
+
+    // Initialize WASM on page load
+    initWasm();
+  </script>
+</body>
+</html>

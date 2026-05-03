@@ -66,6 +66,7 @@ use super::overlap::cartesian_gaussian_normalization;
 use super::GaussianProduct;
 use crate::basis::{BasisSet, ContractedShell};
 use crate::boys::boys_eval_all;
+use crate::rys::rys_roots;
 use std::f64::consts::PI;
 
 // =============================================================================
@@ -200,36 +201,28 @@ pub fn nuclear_vrr_1d(
 /// Compute the nuclear attraction integral between two primitive Cartesian Gaussians
 /// for a single nucleus at position C with unit charge.
 ///
-/// This implements the Obara-Saika scheme to compute:
-/// ```text
-/// V = ⟨G_a|-1/|r-C||G_b⟩
-/// ```
-/// where `G_a` and `G_b` are primitive Gaussians with angular momentum
-/// specified by `a_powers` and `b_powers`.
-///
-/// The nuclear charge Z is NOT included here; it should be multiplied in the caller.
-///
-/// # Arguments
-///
-/// * `gp` - Pre-computed Gaussian product data
-/// * `a_powers` - Cartesian powers (i, j, k) for bra Gaussian
-/// * `b_powers` - Cartesian powers (i, j, k) for ket Gaussian
-/// * `c` - Nuclear center position [x, y, z]
-///
-/// # Returns
-///
-/// The unnormalized nuclear attraction integral value (without charge factor)
+/// This implements the Rys quadrature scheme following libcint's CINTg1e_nuc.
+/// The Rys-based approach avoids the catastrophic cancellation that occurs in the
+/// auxiliary-index (Boys function) recursion when the nucleus is near a Gaussian center.
 ///
 /// # Algorithm
 ///
-/// 1. Compute auxiliary integrals [0|V|0]^(m) for m = 0..=L_total
-/// 2. Use VRR to build [a|0]^(m) for each Cartesian direction
-/// 3. Use HTR to transfer angular momentum to center B
-/// 4. Combine contributions from all three directions
+/// 1. Compute T = p * |P - C|^2 (Boys function argument)
+/// 2. Compute Rys roots u_n and weights w_n for nroots = (L_total)/2 + 1
+/// 3. For each root n, compute modified VRR coefficients:
+///    - ru_n = u_n / (1 + u_n)
+///    - rt_n = 1/(2p) * (1 - ru_n)  (modified 1/(2p))
+///    - r_n = (P - A) + ru_n * (C - P)  (modified PA, per axis)
+/// 4. Build VRR per root: g[i+1] = r * g[i] + i * rt * g[i-1]
+/// 5. Apply HTR: g[a|b+1] = g[a+1|b] + (A-B) * g[a|b]
+/// 6. Sum over roots: integral = prefactor * sum_n w_n * gx_n * gy_n * gz_n
+///
+/// The nuclear charge Z is NOT included here; it should be multiplied in the caller.
 ///
 /// # Reference
 ///
-/// Obara & Saika (1986), Eqs. 4.1-4.8; libcint g1e.c CINTg1e_nuc
+/// - libcint g1e.c lines 208-320 (CINTg1e_nuc)
+/// - Dupuis, Rys & King (1976), J. Chem. Phys. 65, 111
 pub fn primitive_nuclear(
     gp: &GaussianProduct,
     a_powers: &CartesianPower,
@@ -240,59 +233,182 @@ pub fn primitive_nuclear(
     let l_b = b_powers.angular_momentum() as usize;
     let l_total = l_a + l_b;
 
-    // Maximum auxiliary index needed
-    // For VRR, we need m up to l_total
-    let m_max = l_total;
+    // Number of Rys roots needed
+    let nroots = l_total / 2 + 1;
 
-    // Compute auxiliary integrals [0|V|0]^(m)
-    let aux = nuclear_auxiliary(gp, c, m_max);
-
-    // PC = P - C
-    let pc = [
-        gp.center_p[0] - c[0],
-        gp.center_p[1] - c[1],
-        gp.center_p[2] - c[2],
+    // Compute CP = C - P (nuclear center minus product center)
+    let cp = [
+        c[0] - gp.center_p[0],
+        c[1] - gp.center_p[1],
+        c[2] - gp.center_p[2],
     ];
 
-    // For each Cartesian direction, build [a|b]^(0) using VRR then HTR
-    // The total integral is the product of 1D contributions times the auxiliary
-    nuclear_3d(gp, a_powers, b_powers, &pc, &aux, m_max)
+    // Compute T = p * |P - C|^2 (Boys function argument)
+    let pc_squared = cp[0] * cp[0] + cp[1] * cp[1] + cp[2] * cp[2];
+    let t_arg = gp.p * pc_squared;
+
+    // Prefactor: -2π/p * K_AB
+    // The negative sign for attraction is handled in shell_nuclear (via Z factor).
+    // Here we compute the magnitude: 2π/p * K_AB
+    let prefactor = -2.0 * PI / gp.p * gp.k_ab;
+
+    // PA = P - A (product center minus bra center)
+    let pa = gp.pa;
+    // AB = B - A -> A - B = -AB
+    let a_minus_b = [-gp.ab[0], -gp.ab[1], -gp.ab[2]];
+
+    // For s-s case (nroots=1), we can use Boys function directly
+    // For higher angular momentum, use Rys quadrature
+    if nroots == 1 && l_total == 0 {
+        // s-s case: V = prefactor * F_0(T)
+        let boys_results =
+            boys_eval_all(0, t_arg).expect("Boys function evaluation should succeed");
+        return prefactor * boys_results[0].value;
+    }
+
+    // Get Rys roots and weights
+    // rys_roots returns (roots, weights) where roots are in [0, 1)
+    // and weights sum to F_0(T)
+    let (rys_r, rys_w) = match rys_roots(nroots, t_arg) {
+        Ok(result) => (result.roots, result.weights),
+        Err(_) => {
+            // Fallback to Boys function approach for edge cases
+            let m_max = l_total;
+            let aux = nuclear_auxiliary(gp, c, m_max);
+            let pc_dir = [
+                gp.center_p[0] - c[0],
+                gp.center_p[1] - c[1],
+                gp.center_p[2] - c[2],
+            ];
+            return nuclear_integral_recursive_fallback(
+                gp,
+                a_powers.i as i32,
+                a_powers.j as i32,
+                a_powers.k as i32,
+                b_powers.i as i32,
+                b_powers.j as i32,
+                b_powers.k as i32,
+                0,
+                &pc_dir,
+                &aux,
+                m_max,
+            );
+        }
+    };
+
+    // Build VRR tables for each root and accumulate
+    // Following libcint g1e.c lines 282-297
+    //
+    // For each root n:
+    //   ru = u[n] / (1 + u[n])   -- note: rys_roots gives t^2, so u = t^2/(1-t^2)
+    //   Actually, the Rys roots from our rys_roots() are t_n^2 in [0,1).
+    //   The relationship to libcint's u is: u = t^2/(1-t^2), so t^2 = u/(1+u).
+    //   Therefore ru = t^2 (the Rys root directly).
+    //
+    //   rt = 1/(2p) * (1 - ru) = 1/(2p) * (1 - t^2)
+    //   r_x = PA_x + ru * CP_x = PA_x + t^2 * CP_x
+    //
+    // libcint formula (line 283-285):
+    //   ru = tau^2 * u[n] / (1 + u[n])  (tau=1 for point nucleus)
+    //   rt = aij2 - aij2 * ru = aij2 * (1 - ru)
+    //   r0 = rijrx + ru * crij[0]
+    // where rijrx = P - A, crij = C - P
+
+    let nmax = l_a + l_b; // total angular momentum to build in VRR
+    let a_total = (a_powers.i + a_powers.j + a_powers.k) as usize;
+    let b_total = (b_powers.i + b_powers.j + b_powers.k) as usize;
+    let _ = a_total; // used implicitly through a_powers
+    let _ = b_total;
+
+    let mut result = 0.0;
+
+    for root_idx in 0..nroots {
+        let t_sq = rys_r[root_idx]; // t^2, the Rys root in [0, 1)
+        let w_n = rys_w[root_idx]; // weight
+
+        // Modified coefficients for this root
+        // ru = t^2 (the Rys root)
+        let ru = t_sq;
+        let rt = gp.one_over_2p * (1.0 - ru); // modified 1/(2p)
+
+        // Modified PA for each axis: r = PA + ru * CP
+        let r = [pa[0] + ru * cp[0], pa[1] + ru * cp[1], pa[2] + ru * cp[2]];
+
+        // Build VRR tables for each Cartesian direction
+        // g_x[n] = [n|0]_x for n = 0..=nmax (x component)
+        // VRR: g[n+1] = r_x * g[n] + n * rt * g[n-1]
+        let gx = vrr_1d_rys(r[0], rt, nmax);
+        let gy = vrr_1d_rys(r[1], rt, nmax);
+        let gz = vrr_1d_rys(r[2], rt, nmax);
+
+        // Apply HTR to get [a|b] from [a+b|0] values, then combine 3 directions
+        // For the specific (a_powers, b_powers) combination:
+        let val_x = htr_1d(&gx, a_minus_b[0], a_powers.i as usize, b_powers.i as usize);
+        let val_y = htr_1d(&gy, a_minus_b[1], a_powers.j as usize, b_powers.j as usize);
+        let val_z = htr_1d(&gz, a_minus_b[2], a_powers.k as usize, b_powers.k as usize);
+
+        result += w_n * val_x * val_y * val_z;
+    }
+
+    prefactor * result
 }
 
-/// Compute the 3D nuclear attraction integral by combining 1D contributions
+/// Build 1D VRR table for a single Rys root
 ///
-/// This handles the coupling between Cartesian directions through the auxiliary index m.
-fn nuclear_3d(
-    gp: &GaussianProduct,
-    a_powers: &CartesianPower,
-    b_powers: &CartesianPower,
-    pc: &[f64; 3],
-    aux: &[f64],
-    m_max: usize,
-) -> f64 {
-    let a_x = a_powers.i as i32;
-    let a_y = a_powers.j as i32;
-    let a_z = a_powers.k as i32;
+/// VRR: g[n+1] = r * g[n] + n * rt * g[n-1]
+/// where r = PA + ru * CP (modified PA) and rt = 1/(2p) * (1-ru) (modified 1/(2p))
+///
+/// Returns g[0], g[1], ..., g[nmax]
+fn vrr_1d_rys(r: f64, rt: f64, nmax: usize) -> Vec<f64> {
+    let mut g = vec![0.0; nmax + 1];
+    g[0] = 1.0;
 
-    let b_x = b_powers.i as i32;
-    let b_y = b_powers.j as i32;
-    let b_z = b_powers.k as i32;
+    if nmax > 0 {
+        g[1] = r; // g[1] = r * g[0] = r
 
-    // Build the 3D integral using recursive VRR/HTR
-    // We need to track the auxiliary index through all three directions
-    // The correct approach uses a direct 3D recursion with the auxiliary index.
+        for n in 1..nmax {
+            g[n + 1] = r * g[n] + (n as f64) * rt * g[n - 1];
+        }
+    }
 
-    nuclear_integral_recursive(
-        gp, a_x, a_y, a_z, b_x, b_y, b_z, 0, // starting m = 0
-        pc, aux, m_max,
-    )
+    g
 }
 
-/// Recursive implementation of nuclear attraction VRR+HTR
+/// Apply 1D Horizontal Transfer (HTR) to get [a|b] from VRR table
 ///
-/// Computes [a_x, a_y, a_z | b_x, b_y, b_z]^(m)
+/// HTR: [a|b+1] = [a+1|b] + (A-B) * [a|b]
+///
+/// Given g[n] = [n|0], compute [a|b].
+fn htr_1d(g: &[f64], a_minus_b: f64, a: usize, b: usize) -> f64 {
+    if b == 0 {
+        return g[a];
+    }
+
+    // Build HTR table: h[aa][bb] = [aa|bb]
+    // Initialize with h[n][0] = g[n]
+    // HTR: h[aa][bb+1] = h[aa+1][bb] + (A-B) * h[aa][bb]
+
+    let mut h = vec![vec![0.0; b + 1]; a + b + 1];
+
+    // Initialize from VRR
+    for n in 0..=a + b {
+        h[n][0] = g[n];
+    }
+
+    // Apply HTR
+    for bb in 0..b {
+        for aa in 0..=(a + b - bb - 1) {
+            h[aa][bb + 1] = h[aa + 1][bb] + a_minus_b * h[aa][bb];
+        }
+    }
+
+    h[a][b]
+}
+
+/// Fallback recursive implementation using Boys function auxiliary indices.
+/// Used when Rys quadrature fails (edge cases).
 #[allow(clippy::too_many_arguments)]
-fn nuclear_integral_recursive(
+fn nuclear_integral_recursive_fallback(
     gp: &GaussianProduct,
     a_x: i32,
     a_y: i32,
@@ -305,132 +421,257 @@ fn nuclear_integral_recursive(
     aux: &[f64],
     m_max: usize,
 ) -> f64 {
-    // Check if m is within bounds
     if m > m_max {
         return 0.0;
     }
-
-    // Negative angular momentum check (invalid)
     if a_x < 0 || a_y < 0 || a_z < 0 || b_x < 0 || b_y < 0 || b_z < 0 {
         return 0.0;
     }
-
-    // Base case: [0,0,0|0,0,0]^(m) = aux[m]
     if a_x == 0 && a_y == 0 && a_z == 0 && b_x == 0 && b_y == 0 && b_z == 0 {
         return aux[m];
     }
 
-    // Apply HTR first to reduce b to 0 (transfer angular momentum to a)
-    // HTR: [a|b+1_i]^(m) = [a+1_i|b]^(m) + (A_i - B_i)[a|b]^(m)
-    // Inverse: [a|b]^(m) can be computed from [a+b|0]^(m) via series of HTR
-
-    // If b > 0, apply HTR in reverse: [a|b]^(m) from [a+1|b-1]^(m) - (A-B)[a|b-1]^(m)
-    // Actually: [a|b+1] = [a+1|b] + (A-B)[a|b]
-    // So: [a|b] for b > 0 can be expressed as:
-    // [a|b] = [a+1|b-1] + (A-B)[a|b-1]  (by substituting b-1 for b in HTR)
-    // No wait, that's still HTR building b up from 0.
-
-    // The standard approach: use VRR to build all [a+b|0]^(m), then HTR to transfer.
-    // For recursive implementation, we can apply:
-    // - If b_i > 0 for some i, use HTR: [a|b] = [a+1_i|b-1_i] + (A_i - B_i)[a|b-1_i]
-    // - If all b_i = 0, use VRR to reduce a to 0.
-
-    // Choose the first non-zero b component to reduce via HTR
+    // HTR to reduce b
     if b_x > 0 {
-        // HTR in x: [a_x|b_x]^(m) from [a_x+1|b_x-1]^(m) and [a_x|b_x-1]^(m)
-        let term1 =
-            nuclear_integral_recursive(gp, a_x + 1, a_y, a_z, b_x - 1, b_y, b_z, m, pc, aux, m_max);
-        let term2 =
-            nuclear_integral_recursive(gp, a_x, a_y, a_z, b_x - 1, b_y, b_z, m, pc, aux, m_max);
-        let a_minus_b_x = -gp.ab[0]; // AB = B - A, so A - B = -AB
-        return term1 + a_minus_b_x * term2;
+        let term1 = nuclear_integral_recursive_fallback(
+            gp,
+            a_x + 1,
+            a_y,
+            a_z,
+            b_x - 1,
+            b_y,
+            b_z,
+            m,
+            pc,
+            aux,
+            m_max,
+        );
+        let term2 = nuclear_integral_recursive_fallback(
+            gp,
+            a_x,
+            a_y,
+            a_z,
+            b_x - 1,
+            b_y,
+            b_z,
+            m,
+            pc,
+            aux,
+            m_max,
+        );
+        return term1 + (-gp.ab[0]) * term2;
     }
-
     if b_y > 0 {
-        let term1 =
-            nuclear_integral_recursive(gp, a_x, a_y + 1, a_z, b_x, b_y - 1, b_z, m, pc, aux, m_max);
-        let term2 =
-            nuclear_integral_recursive(gp, a_x, a_y, a_z, b_x, b_y - 1, b_z, m, pc, aux, m_max);
-        let a_minus_b_y = -gp.ab[1];
-        return term1 + a_minus_b_y * term2;
+        let term1 = nuclear_integral_recursive_fallback(
+            gp,
+            a_x,
+            a_y + 1,
+            a_z,
+            b_x,
+            b_y - 1,
+            b_z,
+            m,
+            pc,
+            aux,
+            m_max,
+        );
+        let term2 = nuclear_integral_recursive_fallback(
+            gp,
+            a_x,
+            a_y,
+            a_z,
+            b_x,
+            b_y - 1,
+            b_z,
+            m,
+            pc,
+            aux,
+            m_max,
+        );
+        return term1 + (-gp.ab[1]) * term2;
     }
-
     if b_z > 0 {
-        let term1 =
-            nuclear_integral_recursive(gp, a_x, a_y, a_z + 1, b_x, b_y, b_z - 1, m, pc, aux, m_max);
-        let term2 =
-            nuclear_integral_recursive(gp, a_x, a_y, a_z, b_x, b_y, b_z - 1, m, pc, aux, m_max);
-        let a_minus_b_z = -gp.ab[2];
-        return term1 + a_minus_b_z * term2;
+        let term1 = nuclear_integral_recursive_fallback(
+            gp,
+            a_x,
+            a_y,
+            a_z + 1,
+            b_x,
+            b_y,
+            b_z - 1,
+            m,
+            pc,
+            aux,
+            m_max,
+        );
+        let term2 = nuclear_integral_recursive_fallback(
+            gp,
+            a_x,
+            a_y,
+            a_z,
+            b_x,
+            b_y,
+            b_z - 1,
+            m,
+            pc,
+            aux,
+            m_max,
+        );
+        return term1 + (-gp.ab[2]) * term2;
     }
 
-    // Now b = (0,0,0), apply VRR to reduce a to 0
-    // VRR: [a+1_i|0]^(m) = PA_i[a|0]^(m) - PC_i[a|0]^(m+1) + (a_i/2p)([a-1_i|0]^(m) - [a-1_i|0]^(m+1))
-
-    // Choose the first non-zero a component to reduce
+    // VRR to reduce a
     if a_x > 0 {
-        // VRR in x: [a_x|0]^(m) from [a_x-1|0]^(m), [a_x-1|0]^(m+1), [a_x-2|0]^(m), [a_x-2|0]^(m+1)
-        // [a_x|0]^(m) = PA_x[a_x-1|0]^(m) - PC_x[a_x-1|0]^(m+1) + ((a_x-1)/2p)([a_x-2|0]^(m) - [a_x-2|0]^(m+1))
-        let term1_m = nuclear_integral_recursive(gp, a_x - 1, a_y, a_z, 0, 0, 0, m, pc, aux, m_max);
-        let term1_m1 =
-            nuclear_integral_recursive(gp, a_x - 1, a_y, a_z, 0, 0, 0, m + 1, pc, aux, m_max);
-
-        let vrr_term1 = gp.pa[0] * term1_m - pc[0] * term1_m1;
-
-        let vrr_term2 = if a_x >= 2 {
-            let term2_m =
-                nuclear_integral_recursive(gp, a_x - 2, a_y, a_z, 0, 0, 0, m, pc, aux, m_max);
-            let term2_m1 =
-                nuclear_integral_recursive(gp, a_x - 2, a_y, a_z, 0, 0, 0, m + 1, pc, aux, m_max);
-            (a_x - 1) as f64 * gp.one_over_2p * (term2_m - term2_m1)
+        let term1_m =
+            nuclear_integral_recursive_fallback(gp, a_x - 1, a_y, a_z, 0, 0, 0, m, pc, aux, m_max);
+        let term1_m1 = nuclear_integral_recursive_fallback(
+            gp,
+            a_x - 1,
+            a_y,
+            a_z,
+            0,
+            0,
+            0,
+            m + 1,
+            pc,
+            aux,
+            m_max,
+        );
+        let vrr1 = gp.pa[0] * term1_m - pc[0] * term1_m1;
+        let vrr2 = if a_x >= 2 {
+            let t2_m = nuclear_integral_recursive_fallback(
+                gp,
+                a_x - 2,
+                a_y,
+                a_z,
+                0,
+                0,
+                0,
+                m,
+                pc,
+                aux,
+                m_max,
+            );
+            let t2_m1 = nuclear_integral_recursive_fallback(
+                gp,
+                a_x - 2,
+                a_y,
+                a_z,
+                0,
+                0,
+                0,
+                m + 1,
+                pc,
+                aux,
+                m_max,
+            );
+            (a_x - 1) as f64 * gp.one_over_2p * (t2_m - t2_m1)
         } else {
             0.0
         };
-
-        return vrr_term1 + vrr_term2;
+        return vrr1 + vrr2;
     }
-
     if a_y > 0 {
-        let term1_m = nuclear_integral_recursive(gp, a_x, a_y - 1, a_z, 0, 0, 0, m, pc, aux, m_max);
-        let term1_m1 =
-            nuclear_integral_recursive(gp, a_x, a_y - 1, a_z, 0, 0, 0, m + 1, pc, aux, m_max);
-
-        let vrr_term1 = gp.pa[1] * term1_m - pc[1] * term1_m1;
-
-        let vrr_term2 = if a_y >= 2 {
-            let term2_m =
-                nuclear_integral_recursive(gp, a_x, a_y - 2, a_z, 0, 0, 0, m, pc, aux, m_max);
-            let term2_m1 =
-                nuclear_integral_recursive(gp, a_x, a_y - 2, a_z, 0, 0, 0, m + 1, pc, aux, m_max);
-            (a_y - 1) as f64 * gp.one_over_2p * (term2_m - term2_m1)
+        let term1_m =
+            nuclear_integral_recursive_fallback(gp, a_x, a_y - 1, a_z, 0, 0, 0, m, pc, aux, m_max);
+        let term1_m1 = nuclear_integral_recursive_fallback(
+            gp,
+            a_x,
+            a_y - 1,
+            a_z,
+            0,
+            0,
+            0,
+            m + 1,
+            pc,
+            aux,
+            m_max,
+        );
+        let vrr1 = gp.pa[1] * term1_m - pc[1] * term1_m1;
+        let vrr2 = if a_y >= 2 {
+            let t2_m = nuclear_integral_recursive_fallback(
+                gp,
+                a_x,
+                a_y - 2,
+                a_z,
+                0,
+                0,
+                0,
+                m,
+                pc,
+                aux,
+                m_max,
+            );
+            let t2_m1 = nuclear_integral_recursive_fallback(
+                gp,
+                a_x,
+                a_y - 2,
+                a_z,
+                0,
+                0,
+                0,
+                m + 1,
+                pc,
+                aux,
+                m_max,
+            );
+            (a_y - 1) as f64 * gp.one_over_2p * (t2_m - t2_m1)
         } else {
             0.0
         };
-
-        return vrr_term1 + vrr_term2;
+        return vrr1 + vrr2;
     }
-
     if a_z > 0 {
-        let term1_m = nuclear_integral_recursive(gp, a_x, a_y, a_z - 1, 0, 0, 0, m, pc, aux, m_max);
-        let term1_m1 =
-            nuclear_integral_recursive(gp, a_x, a_y, a_z - 1, 0, 0, 0, m + 1, pc, aux, m_max);
-
-        let vrr_term1 = gp.pa[2] * term1_m - pc[2] * term1_m1;
-
-        let vrr_term2 = if a_z >= 2 {
-            let term2_m =
-                nuclear_integral_recursive(gp, a_x, a_y, a_z - 2, 0, 0, 0, m, pc, aux, m_max);
-            let term2_m1 =
-                nuclear_integral_recursive(gp, a_x, a_y, a_z - 2, 0, 0, 0, m + 1, pc, aux, m_max);
-            (a_z - 1) as f64 * gp.one_over_2p * (term2_m - term2_m1)
+        let term1_m =
+            nuclear_integral_recursive_fallback(gp, a_x, a_y, a_z - 1, 0, 0, 0, m, pc, aux, m_max);
+        let term1_m1 = nuclear_integral_recursive_fallback(
+            gp,
+            a_x,
+            a_y,
+            a_z - 1,
+            0,
+            0,
+            0,
+            m + 1,
+            pc,
+            aux,
+            m_max,
+        );
+        let vrr1 = gp.pa[2] * term1_m - pc[2] * term1_m1;
+        let vrr2 = if a_z >= 2 {
+            let t2_m = nuclear_integral_recursive_fallback(
+                gp,
+                a_x,
+                a_y,
+                a_z - 2,
+                0,
+                0,
+                0,
+                m,
+                pc,
+                aux,
+                m_max,
+            );
+            let t2_m1 = nuclear_integral_recursive_fallback(
+                gp,
+                a_x,
+                a_y,
+                a_z - 2,
+                0,
+                0,
+                0,
+                m + 1,
+                pc,
+                aux,
+                m_max,
+            );
+            (a_z - 1) as f64 * gp.one_over_2p * (t2_m - t2_m1)
         } else {
             0.0
         };
-
-        return vrr_term1 + vrr_term2;
+        return vrr1 + vrr2;
     }
 
-    // Should not reach here if logic is correct
     0.0
 }
 

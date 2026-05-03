@@ -9,6 +9,7 @@
  */
 
 import { encodeRunState, decodeRunState } from './deeplink';
+import { getModuleRoute } from './routes';
 import type { RunStateV1 } from '../types/run-state';
 
 /**
@@ -122,7 +123,8 @@ export function clearURL(): void {
  * ```
  */
 export function generateShareURL(state: RunStateV1, baseUrl?: string): string {
-  const base = baseUrl ?? `${window.location.origin}/${state.module}`;
+  const modulePath = getModuleRoute(state.module);
+  const base = baseUrl ?? `${window.location.origin}${modulePath}`;
   const encoded = encodeRunState(state);
   const url = new URL(base);
   url.searchParams.set(STATE_PARAM, encoded);

@@ -7,7 +7,8 @@
  * @module components/rys/RysErrorChart
  */
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
+import Plotly from 'plotly.js-cartesian-dist';
 import { PlotPanel } from '../common';
 import type { Data, Layout, Shape, Annotations } from 'plotly.js';
 import type { RysErrorCurveResult } from '../../worker/protocol';
@@ -15,6 +16,9 @@ import { type TargetAccuracy, targetToNumber, findRecommendedOrder } from '../..
 
 // Use Plotly's Annotations type for individual annotation objects
 type PlotlyAnnotation = Annotations;
+
+/** Stable div ID for Plotly SVG export. */
+const PLOT_DIV_ID = 'rys-error-curve-plot';
 
 /**
  * Props for RysErrorChart component.
@@ -24,6 +28,10 @@ export interface RysErrorChartProps {
   errorCurve: RysErrorCurveResult | null;
   /** Target accuracy for threshold line */
   target: TargetAccuracy;
+  /** Maximum quadrature order tested (for SVG filename) */
+  nMax?: number;
+  /** Current T parameter value (for SVG filename) */
+  T?: number;
   /** Whether computation is loading */
   loading?: boolean;
   /** Error message to display */
@@ -118,6 +126,8 @@ function createRecommendedAnnotation(
 export function RysErrorChart({
   errorCurve,
   target,
+  nMax = 10,
+  T = 0,
   loading = false,
   error = null,
 }: RysErrorChartProps) {
@@ -251,16 +261,49 @@ export function RysErrorChart({
     };
   }, [target, yValues, recommendedOrder, recommendedError]);
 
+  // SVG export handler
+  const handleExportSvg = useCallback(() => {
+    const plotEl = document.getElementById(PLOT_DIV_ID);
+    if (plotEl) {
+      Plotly.downloadImage(plotEl as unknown as Plotly.PlotlyHTMLElement, {
+        format: 'svg',
+        filename: `rys-error-curve-n${nMax}-T${T.toFixed(1)}`,
+        width: 800,
+        height: 500,
+      });
+    }
+  }, [nMax, T]);
+
   return (
-    <PlotPanel
-      data={data}
-      layout={layout}
-      loading={loading}
-      error={error}
-      ariaLabel={`Rys error curve chart showing error vs quadrature order`}
-      minHeight={350}
-      className="w-full"
-    />
+    <div>
+      <PlotPanel
+        data={data}
+        layout={layout}
+        loading={loading}
+        error={error}
+        ariaLabel={`Rys error curve chart showing error vs quadrature order`}
+        minHeight={350}
+        className="w-full"
+        divId={PLOT_DIV_ID}
+      />
+
+      {/* Export SVG button */}
+      {errorCurve && errorCurve.points.length > 0 && (
+        <div className="flex justify-end mt-1">
+          <button
+            type="button"
+            onClick={handleExportSvg}
+            className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
+            aria-label="Export error curve plot as SVG"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Export SVG
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

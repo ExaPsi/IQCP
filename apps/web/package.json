@@ -12,9 +12,14 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"No tests configured yet\" && exit 0"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:bundle": "bash scripts/check-bundle-size.sh",
+    "check:all": "npm run typecheck && npm run lint && npm run build && npm run check:bundle"
   },
   "dependencies": {
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
     "@types/react-plotly.js": "^2.6.4",
     "html2pdf.js": "^0.14.0",
     "katex": "^0.16.27",
@@ -31,6 +36,7 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "three": "^0.183.2",
     "zod": "^4.3.5",
     "zustand": "^5.0.0"
   },
@@ -41,6 +47,7 @@
     "@types/node": "^25.0.9",
     "@types/react": "^18.3.16",
     "@types/react-dom": "^18.3.5",
+    "@types/three": "^0.183.1",
     "@vitejs/plugin-react-swc": "^3.7.2",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.17.0",
@@ -54,6 +61,7 @@
     "vite": "^6.0.3",
     "vite-plugin-cross-origin-isolation": "^0.1.6",
     "vite-plugin-top-level-await": "^1.4.4",
-    "vite-plugin-wasm": "^3.3.0"
+    "vite-plugin-wasm": "^3.3.0",
+    "vitest": "^4.1.0"
   }
 }

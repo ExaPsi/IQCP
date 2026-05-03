@@ -68,6 +68,44 @@ export interface ErrorCurvePoint {
 }
 
 /**
+ * A single point in the PES scan artifact data.
+ */
+export interface PesArtifactPoint {
+  /** Bond distance in bohr */
+  r_bohr: number;
+  /** Total SCF energy in Hartree */
+  energy: number;
+  /** Whether SCF converged at this geometry */
+  converged: boolean;
+  /** Number of SCF iterations at this point */
+  iterations: number;
+}
+
+/**
+ * PES scan data embedded in an SCF artifact.
+ *
+ * @see US-041 PES Curve Visualization
+ */
+export interface PesScanArtifactData {
+  /** Molecule identifier (e.g., "H2") */
+  molecule: string;
+  /** Basis set name (e.g., "STO-3G") */
+  basis: string;
+  /** Scanned parameter name */
+  scan_parameter: string;
+  /** Atom indices involved in the scan */
+  atom_indices: [number, number];
+  /** Distance unit */
+  unit: string;
+  /** All scan points */
+  points: PesArtifactPoint[];
+  /** Equilibrium from parabolic interpolation (null if not found) */
+  equilibrium: { r_bohr: number; energy_hartree: number } | null;
+  /** Total computation time in milliseconds */
+  compute_time_ms: number;
+}
+
+/**
  * SCF computation result data
  *
  * Contains the final energy, convergence status, and full iteration
@@ -88,6 +126,8 @@ export interface ScfArtifactData {
   orbital_energies?: number[];
   /** HOMO-LUMO gap in Hartree (if internals mode) */
   homo_lumo_gap?: number;
+  /** PES scan data (when a PES scan has been completed) */
+  pes_scan?: PesScanArtifactData;
 }
 
 /**
@@ -272,6 +312,33 @@ export const RysArtifactDataSchema = z.object({
 });
 
 /**
+ * Zod schema for PesArtifactPoint
+ */
+export const PesArtifactPointSchema = z.object({
+  r_bohr: z.number(),
+  energy: z.number(),
+  converged: z.boolean(),
+  iterations: z.number().int().min(0),
+});
+
+/**
+ * Zod schema for PesScanArtifactData
+ */
+export const PesScanArtifactDataSchema = z.object({
+  molecule: z.string().min(1),
+  basis: z.string().min(1),
+  scan_parameter: z.string().min(1),
+  atom_indices: z.tuple([z.number().int(), z.number().int()]),
+  unit: z.string().min(1),
+  points: z.array(PesArtifactPointSchema),
+  equilibrium: z.object({
+    r_bohr: z.number(),
+    energy_hartree: z.number(),
+  }).nullable(),
+  compute_time_ms: z.number().min(0),
+});
+
+/**
  * Zod schema for ScfArtifactData
  */
 export const ScfArtifactDataSchema = z.object({
@@ -282,6 +349,7 @@ export const ScfArtifactDataSchema = z.object({
   trace: z.array(ScfIterationHistorySchema),
   orbital_energies: z.array(z.number()).optional(),
   homo_lumo_gap: z.number().optional(),
+  pes_scan: PesScanArtifactDataSchema.optional(),
 });
 
 /**

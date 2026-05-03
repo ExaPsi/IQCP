@@ -1,7 +1,7 @@
 /**
  * Boys Module State Store
  *
- * Zustand store managing the state for Module A (Boys Function Lab).
+ * Zustand store managing the state for Module C (Boys Function Lab).
  * Handles parameter inputs, computation status, and URL synchronization.
  *
  * @module stores/boysStore
@@ -9,8 +9,9 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { BoysEvalResult, BoysSweepResult } from '../worker/protocol';
+import type { BoysEvalResult, BoysSweepResult, BoysEvalAllResult } from '../worker/protocol';
 import type { BoysParams } from '../types/run-state';
+import { getMaxTValue } from '../lib/boysConstants';
 
 /**
  * Computation status discriminated union.
@@ -34,8 +35,9 @@ export type SweepStatus = 'idle' | 'pending' | 'success' | 'error';
  * Display mode for Boys function results.
  * - 'explain': Educational explanations of methods
  * - 'internals': Raw computational details and metrics
+ * - 'multi-order': Multi-order comparison showing F_0..F_m at fixed T
  */
-export type DisplayMode = 'explain' | 'internals';
+export type DisplayMode = 'explain' | 'internals' | 'multi-order';
 
 /**
  * Boys store state interface.
@@ -61,6 +63,12 @@ export interface BoysState {
   sweepStatus: SweepStatus;
   /** Sweep computation error message */
   sweepError: string | null;
+  /** Multi-order computation data (F_0..F_m at fixed T) */
+  multiOrderData: BoysEvalAllResult | null;
+  /** Multi-order computation status */
+  multiOrderStatus: SweepStatus;
+  /** Multi-order computation error message */
+  multiOrderError: string | null;
 }
 
 /**
@@ -93,6 +101,12 @@ export interface BoysActions {
   setSweepStatus: (status: SweepStatus) => void;
   /** Set sweep computation error */
   setSweepError: (error: string | null) => void;
+  /** Set multi-order computation data */
+  setMultiOrderData: (data: BoysEvalAllResult | null) => void;
+  /** Set multi-order computation status */
+  setMultiOrderStatus: (status: SweepStatus) => void;
+  /** Set multi-order computation error */
+  setMultiOrderError: (error: string | null) => void;
 }
 
 /**
@@ -109,13 +123,16 @@ const DEFAULT_STATE: BoysState = {
   sweepData: null,
   sweepStatus: 'idle',
   sweepError: null,
+  multiOrderData: null,
+  multiOrderStatus: 'idle',
+  multiOrderError: null,
 };
 
 /**
  * Boys function state store.
  *
  * Manages parameter inputs (m, T, view), computation status,
- * and URL synchronization for Module A.
+ * and URL synchronization for Module C.
  *
  * @example
  * ```typescript
@@ -136,7 +153,7 @@ const DEFAULT_STATE: BoysState = {
  */
 export const useBoysStore = create<BoysState & BoysActions>()(
   devtools(
-    (set) => ({
+    (set, get) => ({
       // Initial state
       ...DEFAULT_STATE,
 
@@ -148,8 +165,10 @@ export const useBoysStore = create<BoysState & BoysActions>()(
       },
 
       setT: (T: number) => {
-        // Clamp T to valid range [0, 50]
-        const clampedT = Math.max(0, Math.min(50, T));
+        // Clamp T to valid range [0, maxT(m)]
+        const currentM = get().m;
+        const maxT = getMaxTValue(currentM);
+        const clampedT = Math.max(0, Math.min(maxT, T));
         set({ T: clampedT }, false, 'setT');
       },
 
@@ -165,7 +184,7 @@ export const useBoysStore = create<BoysState & BoysActions>()(
         set(
           {
             m: Math.max(0, Math.min(10, Math.round(params.m))),
-            T: Math.max(0, Math.min(50, params.T)),
+            T: Math.max(0, Math.min(getMaxTValue(Math.round(params.m)), params.T)),
             view: params.view,
             urlInitialized: true,
           },
@@ -208,6 +227,18 @@ export const useBoysStore = create<BoysState & BoysActions>()(
 
       setSweepError: (error: string | null) => {
         set({ sweepError: error }, false, 'setSweepError');
+      },
+
+      setMultiOrderData: (data: BoysEvalAllResult | null) => {
+        set({ multiOrderData: data }, false, 'setMultiOrderData');
+      },
+
+      setMultiOrderStatus: (status: SweepStatus) => {
+        set({ multiOrderStatus: status }, false, 'setMultiOrderStatus');
+      },
+
+      setMultiOrderError: (error: string | null) => {
+        set({ multiOrderError: error }, false, 'setMultiOrderError');
       },
     }),
     { name: 'boysStore' }

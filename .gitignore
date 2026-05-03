@@ -47,10 +47,12 @@ out/
 *.swp
 *.swo
 *.swn
+*~
 Session.vim
 .netrwhist
 
 # Emacs
+*~
 \#*\#
 /.emacs.desktop
 /.emacs.desktop.lock
@@ -68,6 +70,7 @@ tramp
 # ========================================
 /target/
 **/target/
+Cargo.lock
 **/*.rs.bk
 *.pdb
 
@@ -77,6 +80,7 @@ tramp
 pkg/
 *.wasm
 *.wat
+*.wasm.gz
 
 # ========================================
 # Node.js / npm / pnpm / yarn
@@ -105,6 +109,7 @@ out/
 .nuxt/
 .output/
 .turbo/
+.vite/
 
 # ========================================
 # Environment and Configuration
@@ -149,7 +154,6 @@ env/
 *.pyc
 *.pyo
 *.egg-info/
-__pycache__/
 
 # ========================================
 # Testing and Coverage
@@ -161,6 +165,9 @@ coverage/
 htmlcov/
 .tox/
 .pytest_cache/
+__pycache__/
+playwright-report/
+test-results/
 
 # ========================================
 # Documentation Build
@@ -188,6 +195,29 @@ temp/
 *.backup
 
 # ========================================
+# Package Lock Files (optional - uncomment if needed)
+# ========================================
+# package-lock.json
+# pnpm-lock.yaml
+# yarn.lock
+
+# ========================================
+# Reference Libraries (external knowledge bases)
+# ========================================
+references/
+
+# ========================================
+# Manuscripts and Publications (local only)
+# ========================================
+docs/Manuscripts/
+
+# ========================================
+# Benchmark Results (machine-specific)
+# ========================================
+tests/benchmarks/pyscf/results/*.json
+tests/benchmarks/bundle/results/*.json
+
+# ========================================
 # Miscellaneous
 # ========================================
 *.cache
@@ -198,3 +228,5 @@ temp/
 *.tsbuildinfo
 .vercel
 .netlify
+
+

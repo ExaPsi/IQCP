@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+// Build-time constant injected by Vite define config (from package.json version)
+declare const __APP_VERSION__: string;
+
 // Type declaration for plotly.js-basic-dist (uses same types as plotly.js)
 declare module 'plotly.js-basic-dist' {
   import Plotly from 'plotly.js';

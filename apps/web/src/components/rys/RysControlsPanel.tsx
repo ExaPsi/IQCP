@@ -54,7 +54,7 @@ const SHELL_QUARTETS: ShellQuartet[] = [
  *
  * Includes:
  * - Order (n): Integer selector 1-10 with +/- buttons
- * - Parameter (T): Range slider 0-50
+ * - Parameter (T): Range slider 0-100
  * - Target accuracy: Segmented buttons (10^-4, 10^-6, 10^-8)
  * - Display mode: Toggle between 'explain' and 'internals'
  *
@@ -170,7 +170,7 @@ export function RysControlsPanel({ disabled = false }: RysControlsPanelProps) {
           id="rys-t-slider"
           type="range"
           min={0}
-          max={50}
+          max={100}
           step={0.1}
           value={T}
           onChange={(e) => setT(Number(e.target.value))}
@@ -178,7 +178,7 @@ export function RysControlsPanel({ disabled = false }: RysControlsPanelProps) {
           className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Parameter T slider"
           aria-valuemin={0}
-          aria-valuemax={50}
+          aria-valuemax={100}
           aria-valuenow={T}
         />
         <div className="flex justify-between mt-2">
@@ -186,7 +186,7 @@ export function RysControlsPanel({ disabled = false }: RysControlsPanelProps) {
           <span className="text-sm font-mono text-slate-700">
             T = {T.toFixed(1)}
           </span>
-          <span className="text-xs text-slate-500">50</span>
+          <span className="text-xs text-slate-500">100</span>
         </div>
       </div>
 
