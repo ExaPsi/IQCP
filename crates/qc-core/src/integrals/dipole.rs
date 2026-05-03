@@ -388,6 +388,7 @@ pub fn dipole_matrix(basis: &BasisSet, gauge_origin: &[f64; 3]) -> [DMatrix<f64>
 /// Gaussians. This is physically correct because we are differentiating
 /// the Cartesian basis function, which keeps its normalization fixed
 /// while its center moves.
+#[allow(clippy::needless_range_loop)] // `e` indexes per-Cartesian helpers, not just `result`
 pub fn shell_dipole_first_deriv(
     shell_a: &ContractedShell,
     shell_b: &ContractedShell,

@@ -70,7 +70,8 @@ tramp
 # ========================================
 /target/
 **/target/
-Cargo.lock
+# NOTE: Cargo.lock is intentionally tracked at the workspace root
+# (binary/application project — pinned for reproducibility).
 **/*.rs.bk
 *.pdb
 

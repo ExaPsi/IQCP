@@ -1140,7 +1140,7 @@ where
                     if q_ij * q_kl < SCHWARZ_THRESHOLD {
                         mu_l += n_l;
                         shell_quartets_done += 1;
-                        if shell_quartets_done % progress_interval == 0
+                        if shell_quartets_done.is_multiple_of(progress_interval)
                             || shell_quartets_done == total_shell_quartets
                         {
                             on_progress(shell_quartets_done, total_shell_quartets);
@@ -1177,7 +1177,7 @@ where
 
                     mu_l += n_l;
                     shell_quartets_done += 1;
-                    if shell_quartets_done % progress_interval == 0
+                    if shell_quartets_done.is_multiple_of(progress_interval)
                         || shell_quartets_done == total_shell_quartets
                     {
                         on_progress(shell_quartets_done, total_shell_quartets);
@@ -1259,6 +1259,7 @@ pub(crate) const SCHWARZ_THRESHOLD: f64 = 1e-12;
 
 /// Compute Schwarz upper bounds for all shell pairs: sqrt((ij|ij))
 /// Used for screening: |(ij|kl)| <= Q_ij * Q_kl where Q_ij = sqrt((ij|ij))
+#[allow(clippy::needless_range_loop)] // i,j index basis.shells AND fill bounds symmetrically
 pub(crate) fn compute_schwarz_bounds(basis: &BasisSet) -> Vec<Vec<f64>> {
     let n_shells = basis.shells.len();
     let mut bounds = vec![vec![0.0; n_shells]; n_shells];
@@ -1662,7 +1663,7 @@ where
                     if q_ij * q_kl < SCHWARZ_THRESHOLD {
                         mu_l += n_l;
                         shell_quartets_done += 1;
-                        if shell_quartets_done % progress_interval == 0
+                        if shell_quartets_done.is_multiple_of(progress_interval)
                             || shell_quartets_done == total_shell_quartets
                         {
                             on_progress(shell_quartets_done, total_shell_quartets);
@@ -1698,7 +1699,7 @@ where
 
                     mu_l += n_l;
                     shell_quartets_done += 1;
-                    if shell_quartets_done % progress_interval == 0
+                    if shell_quartets_done.is_multiple_of(progress_interval)
                         || shell_quartets_done == total_shell_quartets
                     {
                         on_progress(shell_quartets_done, total_shell_quartets);

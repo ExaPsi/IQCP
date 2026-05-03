@@ -996,6 +996,7 @@ pub fn rhf_gradient(
 ///
 /// # Returns
 /// `GradientResult` with finite-difference gradients
+#[allow(clippy::needless_range_loop)] // dir indexes position[dir] and grad[atom_idx][dir]
 pub fn rhf_gradient_finite_difference(
     basis: &BasisSet,
     basis_name: &str,
@@ -2125,6 +2126,7 @@ pub(crate) fn evaluate_basis_hessian_on_grid(
 /// # Reference
 /// PySCF `gto/eval_gto.c` (GTOval_sph_deriv3), `hessian/rks.py` lines 231-236
 /// (`_get_vxc_diag` GGA branch, `contract_` helper).
+#[allow(clippy::needless_range_loop)] // a,b index lower2(...) args + symmetric d2_ang fill
 pub(crate) fn evaluate_basis_third_deriv_on_grid(
     basis: &BasisSet,
     grid_points: &[[f64; 3]],
@@ -2401,6 +2403,7 @@ pub(crate) fn triple_to_d3_idx(a: usize, b: usize, c: usize) -> usize {
 ///
 /// # Returns
 /// `GradientResult` with per-atom gradients in Ha/bohr
+#[allow(clippy::needless_range_loop)] // dir indexes position[dir] and grad[atom_idx][dir]
 pub fn ks_dft_gradient_fd(
     atoms: &[Atom],
     basis_name: &str,

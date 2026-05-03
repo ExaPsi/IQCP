@@ -47,6 +47,18 @@ export default defineConfig({
     build: {
         target: 'esnext',
         rollupOptions: {
+            // `initThreadPool` is only present in the parallel-feature WASM build;
+            // the worker probes for it at runtime via dynamic property access. The
+            // single-threaded build legitimately omits the export, so silence the
+            // expected static-analysis warning to keep the build log clean.
+            onwarn(warning, warn) {
+                if (warning.code === 'MISSING_EXPORT' &&
+                    typeof warning.message === 'string' &&
+                    warning.message.includes('"initThreadPool" is not exported')) {
+                    return;
+                }
+                warn(warning);
+            },
             output: {
                 manualChunks: {
                     // Phase 2 (US-035): Code-split Three.js and R3F into a separate chunk

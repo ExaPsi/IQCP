@@ -808,6 +808,12 @@ pub const LEBEDEV_86: &[[f64; 4]; 86] = &[
 /// 194-point Lebedev grid (exact up to L=23).
 ///
 /// Weights sum to 4*pi = 12.566370614359172.
+///
+/// The literals 7.0710678118654757e-01 are √2/2 (= `f64::consts::FRAC_1_SQRT_2`),
+/// kept verbatim here because this table is a literal reproduction of the
+/// published Lebedev–Laikov quadrature points (cross-checkable digit-for-digit
+/// against the reference). `approx_constant` is allowed for the same reason.
+#[allow(clippy::approx_constant)]
 pub const LEBEDEV_194: &[[f64; 4]; 194] = &[
     [
         1.0000000000000000e+00,

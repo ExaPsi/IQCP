@@ -228,7 +228,7 @@ impl BasisSet {
     /// Check if this is a closed-shell system (even number of electrons)
     #[inline]
     pub fn is_closed_shell(&self) -> bool {
-        self.n_electrons % 2 == 0
+        self.n_electrons.is_multiple_of(2)
     }
 
     /// Get the number of occupied orbitals (for RHF)

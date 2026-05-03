@@ -356,7 +356,7 @@ impl PresetSystem {
     /// Validate the system data
     pub fn validate(&self) -> ScfResult<()> {
         // Check positive and even electron count
-        if self.nelec == 0 || self.nelec % 2 != 0 {
+        if self.nelec == 0 || !self.nelec.is_multiple_of(2) {
             return Err(ScfError::InvalidElectronCount(self.nelec));
         }
 
