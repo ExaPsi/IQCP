@@ -29,15 +29,15 @@ All computation runs entirely client-side via two WebAssembly modules (470 KB co
 
 Validated against PySCF 2.11.0 across **108 single-point benchmark systems** (six molecules × six basis sets × three methods):
 
-| Quantity | Maximum deviation | Median |
-|----------|-------------------|--------|
-| RHF energy | 77 nHa | 0.4 nHa |
-| DFT energy | 148 µHa | 21 µHa |
-| RHF gradient | 10⁻⁵ Ha/bohr | — |
-| H₂O frequency | <0.01 cm⁻¹ | — |
-| H₂O ZPE | 7.0 × 10⁻⁷ Ha | — |
-| H₂O Gibbs (298 K) | 7.6 × 10⁻⁷ Ha | — |
-| Raman polarizability deriv. (vs Gaussian 09) | 2.5 × 10⁻⁷ Ha/bohr² | — |
+| Quantity                                     | Maximum deviation   | Median  |
+| -------------------------------------------- | ------------------- | ------- |
+| RHF energy                                   | 77 nHa              | 0.4 nHa |
+| DFT energy                                   | 148 µHa             | 21 µHa  |
+| RHF gradient                                 | 10⁻⁵ Ha/bohr        | —       |
+| H₂O frequency                                | <0.01 cm⁻¹          | —       |
+| H₂O ZPE                                      | 7.0 × 10⁻⁷ Ha       | —       |
+| H₂O Gibbs (298 K)                            | 7.6 × 10⁻⁷ Ha       | —       |
+| Raman polarizability deriv. (vs Gaussian 09) | 2.5 × 10⁻⁷ Ha/bohr² | —       |
 
 The 1,418 Rust tests + 361 TypeScript tests in this repository cover all reported numerical claims. See **Reproducing Manuscript Results** below.
 
@@ -83,6 +83,7 @@ qc-core (pure Rust algorithms, native + WASM)
 ```
 
 **Crates:**
+
 - `qc-core` — pure Rust algorithms (SCF, DFT, gradients, Hessians, IR, Raman, thermo)
 - `qc-wasm` — eager-loaded WASM bindings (SCF/DFT/gradients/optimization)
 - `qc-wasm-spectra` — lazy-loaded WASM bindings (Hessian, CPHF, IR, Raman, thermochemistry)
@@ -223,24 +224,24 @@ cd apps/web && npm run lint && npm run typecheck && npm run build
 
 ## Numerical Settings
 
-| Setting | Value |
-|---------|-------|
-| SCF energy convergence | 1 × 10⁻¹⁰ Ha |
-| DIIS subspace size | 6 vectors |
-| ERI storage | 8-fold symmetry, stored once before SCF |
-| DFT grid | SG-1 pruning, 75 Mura–Knowles radial × Lebedev (max 194) |
-| B3LYP variant | B3LYP5 (VWN5 correlation) |
-| Cartesian d-functions | Default (`mol.cart=True` analog) |
+| Setting                       | Value                                                                             |
+| ----------------------------- | --------------------------------------------------------------------------------- |
+| SCF energy convergence        | 1 × 10⁻¹⁰ Ha                                                                      |
+| DIIS subspace size            | 6 vectors                                                                         |
+| ERI storage                   | 8-fold symmetry, stored once before SCF                                           |
+| DFT grid                      | SG-1 pruning, 75 Mura–Knowles radial × Lebedev (max 194)                          |
+| B3LYP variant                 | B3LYP5 (VWN5 correlation)                                                         |
+| Cartesian d-functions         | Default (`mol.cart=True` analog)                                                  |
 | Cross-browser reproducibility | Bit-identical IEEE 754 Float64 (verified across V8, SpiderMonkey, JavaScriptCore) |
 
 ## Performance
 
-| Workflow | Time (Apple M2 Max, Chrome) |
-|----------|-----------------------------|
-| WASM init + first calculation | ~50 ms |
-| H₂O B3LYP/6-31G* SCF | 183 ms |
-| C₆H₆ B3LYP/6-31G* SCF | ~28 s |
-| H₂O frequency analysis | ~5 s |
+| Workflow                      | Time (Apple M2 Max, Chrome) |
+| ----------------------------- | --------------------------- |
+| WASM init + first calculation | ~50 ms                      |
+| H₂O B3LYP/6-31G\* SCF         | 183 ms                      |
+| C₆H₆ B3LYP/6-31G\* SCF        | ~28 s                       |
+| H₂O frequency analysis        | ~5 s                        |
 
 Native Rust outperforms single-threaded PySCF for 95 of 108 benchmark systems under end-to-end conditions; the crossover with PySCF for B3LYP falls between 102 and 126 basis functions.
 
@@ -267,14 +268,14 @@ A companion JCIM Article is in preparation; the citation will be updated upon pu
 
 Key algorithmic references implemented in this work:
 
-- **Boys function:** Shavitt, I. *Methods in Computational Physics* **1963**, *2*, 1–45.
-- **Rys quadrature:** Dupuis, M.; Rys, J.; King, H. F. *J. Chem. Phys.* **1976**, *65*, 111–116.
-- **DIIS:** Pulay, P. *Chem. Phys. Lett.* **1980**, *73*, 393–398; *J. Comput. Chem.* **1982**, *3*, 556–560.
-- **B3LYP:** Becke, A. D. *J. Chem. Phys.* **1993**, *98*, 5648–5652; Stephens et al. *J. Phys. Chem.* **1994**, *98*, 11623–11627.
-- **D3(BJ) dispersion:** Grimme, S. et al. *J. Chem. Phys.* **2010**, *132*, 154104; *J. Comput. Chem.* **2011**, *32*, 1456–1465.
-- **CPHF for Raman:** Amos, R. D. *Chem. Phys. Lett.* **1986**, *124*, 376–381.
-- **PySCF (validation reference):** Sun, Q. et al. *J. Chem. Phys.* **2020**, *153*, 024109.
-- **WebAssembly:** Haas, A. et al. *PLDI* **2017**.
+- **Boys function:** Shavitt, I. _Methods in Computational Physics_ **1963**, _2_, 1–45.
+- **Rys quadrature:** Dupuis, M.; Rys, J.; King, H. F. _J. Chem. Phys._ **1976**, _65_, 111–116.
+- **DIIS:** Pulay, P. _Chem. Phys. Lett._ **1980**, _73_, 393–398; _J. Comput. Chem._ **1982**, _3_, 556–560.
+- **B3LYP:** Becke, A. D. _J. Chem. Phys._ **1993**, _98_, 5648–5652; Stephens et al. _J. Phys. Chem._ **1994**, _98_, 11623–11627.
+- **D3(BJ) dispersion:** Grimme, S. et al. _J. Chem. Phys._ **2010**, _132_, 154104; _J. Comput. Chem._ **2011**, _32_, 1456–1465.
+- **CPHF for Raman:** Amos, R. D. _Chem. Phys. Lett._ **1986**, _124_, 376–381.
+- **PySCF (validation reference):** Sun, Q. et al. _J. Chem. Phys._ **2020**, _153_, 024109.
+- **WebAssembly:** Haas, A. et al. _PLDI_ **2017**.
 
 ## License
 
